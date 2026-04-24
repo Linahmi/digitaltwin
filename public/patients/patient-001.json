@@ -1,0 +1,56 @@
+{
+  "id": "patient-001",
+  "first_name": "John",
+  "last_name": "Smith",
+  "date_of_birth": "1972-03-15",
+  "vitals": {
+    "age": 52,
+    "sex": "male",
+    "height_cm": 178,
+    "weight_kg": 92,
+    "bmi": 29.0,
+    "systolic_bp": 145,
+    "diastolic_bp": 92,
+    "heart_rate": 78,
+    "ldl_cholesterol": 165,
+    "hdl_cholesterol": 42,
+    "triglycerides": 210,
+    "glucose_fasting": 118
+  },
+  "conditions": [
+    {
+      "name": "Essential hypertension",
+      "onset_date": "2018-06-12",
+      "status": "active"
+    },
+    {
+      "name": "Prediabetes",
+      "onset_date": "2021-09-20",
+      "status": "active"
+    },
+    {
+      "name": "Hyperlipidemia",
+      "onset_date": "2019-03-08",
+      "status": "active"
+    }
+  ],
+  "medications": [
+    {
+      "name": "Lisinopril",
+      "dosage": "10mg",
+      "frequency": "once daily",
+      "start_date": "2018-06-12"
+    },
+    {
+      "name": "Atorvastatin",
+      "dosage": "20mg",
+      "frequency": "once daily at bedtime",
+      "start_date": "2019-03-08"
+    }
+  ],
+  "allergies": [
+    "Penicillin"
+  ],
+  "smoking_status": "former",
+  "alcohol_use": "moderate"
+}
