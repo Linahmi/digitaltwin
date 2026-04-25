@@ -1,7 +1,7 @@
 'use client'
 
-import { Domain, PatientSnapshot, DEFAULT_SNAPSHOT } from './domainConfig'
-import { GuidedNarrationFlow } from './GuidedNarrationFlow'
+import { Domain, PatientSnapshot } from './domainConfig'
+import { HealthDashboard } from './HealthDashboard'
 
 export interface AdaptiveInsightFlowProps {
   domain:   Domain
@@ -9,10 +9,5 @@ export interface AdaptiveInsightFlowProps {
 }
 
 export function AdaptiveInsightFlow({ domain, snapshot }: AdaptiveInsightFlowProps) {
-  return (
-    <GuidedNarrationFlow
-      domain={domain}
-      snapshot={snapshot ?? DEFAULT_SNAPSHOT}
-    />
-  )
+  return <HealthDashboard domain={domain} snapshot={snapshot} />
 }
