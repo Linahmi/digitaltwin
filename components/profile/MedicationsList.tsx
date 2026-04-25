@@ -15,7 +15,7 @@ export function MedicationsList({ medications }: MedicationsListProps) {
   return (
     <div className="flex flex-col bg-white border border-[#E5E5E5] rounded-lg h-full overflow-hidden">
       <div className="px-5 py-4 border-b border-[#E5E5E5]">
-        <h3 className="text-xs uppercase tracking-widest text-[#999] font-normal">Current Medications</h3>
+        <h3 className="text-sm font-medium text-[#1a1a1a]">Current Medications</h3>
       </div>
       
       <div className="flex flex-col overflow-y-auto">
