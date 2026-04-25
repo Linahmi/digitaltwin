@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { AlertCircle, UserCircle } from 'lucide-react'
 import Link from 'next/link'
 import { AdaptiveInsightFlow } from '@/components/voice/AdaptiveInsightFlow'
+import { DigitalTwinEye } from '@/components/voice/DigitalTwinEye'
 import {
   getHealthDomain,
   PatientSnapshot,
@@ -463,56 +464,14 @@ export default function VoicePage() {
             I'm here to understand your health journey with you
           </p>
 
-          {/* ── Mic button ──────────────────────────────────────────────────── */}
-          <div style={{ position: 'relative', display: 'inline-block', marginBottom: '2rem' }}>
-            <button
+          {/* ── Digital Twin Eye ────────────────────────────────────────────── */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <DigitalTwinEye
+              isListening={isListening}
+              canInteract={canInteract}
               onClick={toggleMic}
-              disabled={!canInteract}
-              aria-label={isListening ? 'Stop listening' : 'Start listening'}
-              style={{
-                width: 140, height: 140,
-                borderRadius: '50%',
-                background: isActive
-                  ? 'linear-gradient(135deg, #8b5cf6, #06b6d4)'
-                  : 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7))',
-                backdropFilter: 'blur(10px)',
-                border: '2px solid rgba(255,255,255,0.5)',
-                boxShadow: isActive
-                  ? '0 20px 60px rgba(139,92,246,0.3), 0 10px 30px rgba(6,182,212,0.2), inset 0 1px 0 rgba(255,255,255,0.5)'
-                  : '0 20px 60px rgba(139,92,246,0.15), 0 10px 30px rgba(6,182,212,0.1), inset 0 1px 0 rgba(255,255,255,0.5)',
-                cursor: !canInteract ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                position: 'relative', zIndex: 2,
-                animation: isActive ? 'heartbeat 1.5s ease-in-out infinite' : 'gentlePulse 3s ease-in-out infinite',
-                transition: 'background 0.6s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.4s ease',
-                opacity: !canInteract && !isListening ? 0.75 : 1,
-              }}
-            >
-              <svg
-                width="48" height="48" viewBox="0 0 24 24"
-                fill="none"
-                stroke={isActive ? 'white' : '#8b5cf6'}
-                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              >
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
-            </button>
-
-            {/* Breathing glow when active */}
-            {isActive && (
-              <div
-                style={{
-                  position: 'absolute', top: '50%', left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  width: 140, height: 140, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-                  zIndex: 1, filter: 'blur(30px)',
-                  animation: 'breathingGlow 2s ease-in-out infinite',
-                }}
-              />
-            )}
+              size={260}
+            />
           </div>
 
           {/* Status text */}
@@ -533,29 +492,6 @@ export default function VoicePage() {
             }}
           >
             {statusText}
-          </div>
-
-          {/* Waveform — shown while listening */}
-          <div
-            style={{
-              display: 'flex', justifyContent: 'center', alignItems: 'center',
-              gap: 6, height: 70, marginBottom: '2rem',
-              visibility: isListening ? 'visible' : 'hidden',
-            }}
-          >
-            {Array.from({ length: 10 }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  width: 5,
-                  background: 'linear-gradient(180deg, #8b5cf6, #06b6d4)',
-                  borderRadius: 8,
-                  boxShadow: '0 0 10px rgba(139,92,246,0.3)',
-                  animation: 'organicWave 1.5s ease-in-out infinite',
-                  animationDelay: `${[0,0.1,0.2,0.3,0.4,0.5,0.4,0.3,0.2,0.1][i]}s`,
-                }}
-              />
-            ))}
           </div>
 
           {/* Suggestion chips */}
@@ -671,25 +607,6 @@ export default function VoicePage() {
         @keyframes auraPulse {
           0%, 100% { opacity: 0.3; }
           50%       { opacity: 0.6; }
-        }
-        @keyframes gentlePulse {
-          0%, 100% { transform: scale(1);    }
-          50%       { transform: scale(1.03); }
-        }
-        @keyframes heartbeat {
-          0%, 100% { transform: scale(1);    }
-          10%       { transform: scale(1.1);  }
-          20%       { transform: scale(1);    }
-          30%       { transform: scale(1.08); }
-          40%       { transform: scale(1);    }
-        }
-        @keyframes breathingGlow {
-          0%, 100% { opacity: 0.2; transform: translate(-50%, -50%) scale(1);   }
-          50%       { opacity: 0.4; transform: translate(-50%, -50%) scale(1.3); }
-        }
-        @keyframes organicWave {
-          0%, 100% { height: 25px; opacity: 0.6; }
-          50%       { height: 70px; opacity: 1;   }
         }
         @keyframes float {
           0%, 100% { transform: translateY(0px); }
