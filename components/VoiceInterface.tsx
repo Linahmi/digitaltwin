@@ -63,15 +63,85 @@ export function VoiceInterface({ onTranscript, isProcessing, responseText }: Voi
     }
   }
 
-  const speak = (text: string) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = 0.95
-      utterance.pitch = 1.0
-      utterance.onstart = () => setIsSpeaking(true)
-      utterance.onend = () => setIsSpeaking(false)
-      window.speechSynthesis.speak(utterance)
+  const getBestVoice = (): SpeechSynthesisVoice | null => {
+    const voices = window.speechSynthesis.getVoices()
+    if (!voices.length) return null
+
+    // Preferred voices in priority order
+    const preferred = [
+      'Google US English',
+      'Microsoft Zira',
+      'Samantha',
+      'Alex',
+    ]
+
+    for (const name of preferred) {
+      const match = voices.find((v) => v.name.includes(name) && v.lang.startsWith('en'))
+      if (match) return match
+    }
+
+    // Fall back to any en-US voice, then any English voice
+    return (
+      voices.find((v) => v.lang === 'en-US') ??
+      voices.find((v) => v.lang.startsWith('en')) ??
+      null
+    )
+  }
+
+  const waitForVoices = (): Promise<void> =>
+    new Promise((resolve) => {
+      const voices = window.speechSynthesis.getVoices()
+      if (voices.length > 0) {
+        resolve()
+        return
+      }
+      // Chrome loads voices asynchronously
+      window.speechSynthesis.onvoiceschanged = () => resolve()
+      // Safety timeout so we never hang
+      setTimeout(resolve, 2000)
+    })
+
+  const speak = async (text: string) => {
+    if (!('speechSynthesis' in window)) return
+
+    // Cancel anything currently playing
+    window.speechSynthesis.cancel()
+
+    // Wait for voices to become available (Chrome loads them async)
+    await waitForVoices()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'en-US'
+    utterance.rate = 1.0       // slightly faster than default — tweak 0.8‑1.5
+    utterance.pitch = 1.0
+    utterance.volume = 1.0
+
+    const voice = getBestVoice()
+    if (voice) utterance.voice = voice
+
+    utterance.onstart = () => setIsSpeaking(true)
+    utterance.onend = () => setIsSpeaking(false)
+    utterance.onerror = () => setIsSpeaking(false)
+
+    window.speechSynthesis.speak(utterance)
+
+    // Chrome pauses long utterances after ~15 s; this keep-alive prevents that
+    const keepAlive = setInterval(() => {
+      if (!window.speechSynthesis.speaking) {
+        clearInterval(keepAlive)
+        return
+      }
+      window.speechSynthesis.pause()
+      window.speechSynthesis.resume()
+    }, 10_000)
+
+    utterance.onend = () => {
+      clearInterval(keepAlive)
+      setIsSpeaking(false)
+    }
+    utterance.onerror = () => {
+      clearInterval(keepAlive)
+      setIsSpeaking(false)
     }
   }
 

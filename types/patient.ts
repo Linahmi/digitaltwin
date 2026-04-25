@@ -1,3 +1,40 @@
+// types/patient.ts
+// Patient-related TypeScript interfaces.
+// ChatMessage and Citation are used by the voice UI and remain unchanged.
+// SyntheaPatientSummary is the shape returned by /api/patient.
+// The legacy Patient/PatientVitals interfaces are kept for reference only
+// (they are no longer used in production code paths).
+
+export interface SyntheaPatientSummary {
+  id: string
+  firstName: string
+  lastName: string
+  birthDate: string | null
+  gender: string | null
+  age: number | null
+  mainConditions?: string[]
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  citations?: Citation[]
+  timestamp: number
+}
+
+export interface Citation {
+  pmid: string
+  title: string
+  authors: string
+  journal: string
+  year: string
+}
+
+// ── Legacy types (kept for reference, not used in active code) ─────────────
+// These matched the shape of public/patients/patient-001.json.
+// All production code now reads from the SQLite database via
+// lib/db/patientContext.ts and uses SyntheaPatientSummary.
+
 export interface PatientVitals {
   age: number
   sex: 'male' | 'female'
@@ -26,6 +63,7 @@ export interface Medication {
   start_date: string
 }
 
+/** @deprecated Use SyntheaPatientSummary + SQLite query instead */
 export interface Patient {
   id: string
   first_name: string
@@ -37,19 +75,4 @@ export interface Patient {
   allergies: string[]
   smoking_status: 'never' | 'former' | 'current'
   alcohol_use: 'none' | 'occasional' | 'moderate' | 'heavy'
-}
-
-export interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  citations?: Citation[]
-  timestamp: number
-}
-
-export interface Citation {
-  pmid: string
-  title: string
-  authors: string
-  journal: string
-  year: string
 }

@@ -1,6 +1,18 @@
+/**
+ * POST /api/chat
+ *
+ * Receives { message, patientId } — NOT raw patient data.
+ * Loads the patient's full clinical context from SQLite,
+ * then sends it to Claude as part of the system prompt.
+ *
+ * No mock JSON. No patient data is accepted from the client.
+ * If the database is empty or the patient is not found,
+ * the API returns a clear error.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { Patient } from '@/types/patient'
+import { buildSyntheaContext, getPatientSummary } from '@/lib/db/patientContext'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -8,61 +20,108 @@ const anthropic = new Anthropic({
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, patientData } = await request.json()
+    const body = await request.json()
+    const { message, patientId } = body
 
-    if (!message || !patientData) {
+    if (!message || typeof message !== 'string') {
+      return NextResponse.json({ error: 'Missing or invalid message' }, { status: 400 })
+    }
+
+    if (!patientId || typeof patientId !== 'string') {
+      return NextResponse.json({ error: 'Missing patientId' }, { status: 400 })
+    }
+
+    // ── Load patient context from SQLite ──────────────────────────────────
+    // Both calls throw if the database is empty (no fallback to mock data).
+    let patientContext: string
+    let patientName: string
+
+    try {
+      const summary = getPatientSummary(patientId)
+      if (!summary) {
+        return NextResponse.json(
+          { error: `Patient not found: ${patientId}` },
+          { status: 404 }
+        )
+      }
+      patientName = `${summary.firstName} ${summary.lastName}`
+
+      const ctx = buildSyntheaContext(patientId)
+      if (!ctx) {
+        return NextResponse.json(
+          { error: `Could not build context for patient: ${patientId}` },
+          { status: 404 }
+        )
+      }
+      patientContext = ctx
+    } catch (dbError: any) {
+      const isEmptyDB = dbError.message?.includes('No Synthea patients found')
       return NextResponse.json(
-        { error: 'Missing message or patient data' },
-        { status: 400 }
+        { error: dbError.message },
+        { status: isEmptyDB ? 503 : 500 }
       )
     }
 
-    const patient: Patient = patientData
+    // ── Build system prompt ───────────────────────────────────────────────
+    const systemPrompt = `You are a medical digital twin assistant for ${patientName}.
 
-    // Build patient context for Claude
-    const patientContext = buildPatientContext(patient)
+You speak through voice, so your answers must sound natural when read aloud.
 
-    const systemPrompt = `You are a medical digital twin - an AI health assistant for ${patient.first_name} ${patient.last_name}.
+Tone: calm, professional, concise, not overly soft
+- reassuring but not overly gentle
+- confident without sounding robotic
+- like a competent medical assistant explaining things in clinic
+
+Avoid:
+- exaggerated empathy
+- phrases like "don't worry" or "everything is fine"
+- sounding dramatic, patronizing, or too soft
+- long textbook explanations
 
 Your role:
-- Answer health questions using the patient's medical data
-- Speak conversationally like Alexa - natural, warm, concise
-- NEVER say "I don't know" - always provide evidence-based answers
-- When discussing risks or recommendations, cite medical evidence
-- Be encouraging and motivating
-- Use simple language, avoid unnecessary jargon
+- Use only the provided patient context to answer health questions
+- Do not hallucinate clinical data
+- Explain risks and recommendations simply and accurately
+- Personalize answers using the patient context
+- Give practical next steps
+- Be transparent about uncertainty
 
-Patient Context:
+Patient Clinical Context (from Synthea database):
 ${patientContext}
 
-CRITICAL RULES:
-1. Only answer based on evidence - if uncertain, say "based on current medical evidence" and explain
-2. Always justify recommendations with reasoning
-3. Keep responses under 100 words unless asked for detail
-4. Never diagnose - only discuss existing conditions and risk factors
-5. For serious concerns, recommend consulting their doctor
+Critical medical rules:
+1. Do not diagnose definitively.
+2. Do not invent citations or fake studies.
+3. If evidence is general, say "based on current medical evidence" without naming fake references.
+4. If data is missing or shown as N/A, explicitly say what is missing.
+5. For serious or urgent symptoms, advise contacting a doctor or emergency care.
+6. Never say "I don't know" alone. Instead say what can be inferred and what data is needed.
+7. Keep the answer under 100 words unless the user asks for more detail.
 
-Respond naturally as if speaking aloud.`
+Answer style:
+- Start directly.
+- Use short sentences.
+- No bullet points unless specifically asked.
+- Explain: what this means, why it matters, and what to do next.
+- End with one clear next step.
 
+Respond as if speaking aloud.`
+
+    // ── Call Claude ───────────────────────────────────────────────────────
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
+      max_tokens: 400,
       system: systemPrompt,
-      messages: [{
-        role: 'user',
-        content: message
-      }]
+      messages: [{ role: 'user', content: message }],
     })
 
-    const assistantMessage = response.content[0].type === 'text' 
-      ? response.content[0].text 
-      : ''
+    const assistantMessage =
+      response.content[0].type === 'text' ? response.content[0].text : ''
 
     return NextResponse.json({
       response: assistantMessage,
-      usage: response.usage
+      usage: response.usage,
     })
-
   } catch (error) {
     console.error('Chat API error:', error)
     return NextResponse.json(
@@ -70,35 +129,4 @@ Respond naturally as if speaking aloud.`
       { status: 500 }
     )
   }
-}
-
-function buildPatientContext(patient: Patient): string {
-  const age = patient.vitals.age
-  const bmi = patient.vitals.bmi
-  const bmiCategory = bmi < 18.5 ? 'underweight' : bmi < 25 ? 'normal' : bmi < 30 ? 'overweight' : 'obese'
-
-  return `
-Demographics:
-- ${age} year old ${patient.vitals.sex}
-- Height: ${patient.vitals.height_cm}cm, Weight: ${patient.vitals.weight_kg}kg
-- BMI: ${bmi} (${bmiCategory})
-
-Vital Signs:
-- Blood Pressure: ${patient.vitals.systolic_bp}/${patient.vitals.diastolic_bp} mmHg
-- Heart Rate: ${patient.vitals.heart_rate} bpm
-- LDL Cholesterol: ${patient.vitals.ldl_cholesterol || 'N/A'} mg/dL
-- HDL Cholesterol: ${patient.vitals.hdl_cholesterol || 'N/A'} mg/dL
-- Triglycerides: ${patient.vitals.triglycerides || 'N/A'} mg/dL
-- Fasting Glucose: ${patient.vitals.glucose_fasting || 'N/A'} mg/dL
-
-Active Medical Conditions:
-${patient.conditions.filter(c => c.status === 'active').map(c => `- ${c.name} (since ${c.onset_date})`).join('\n')}
-
-Current Medications:
-${patient.medications.map(m => `- ${m.name} ${m.dosage} ${m.frequency}`).join('\n')}
-
-Allergies: ${patient.allergies.join(', ') || 'None'}
-Smoking: ${patient.smoking_status}
-Alcohol: ${patient.alcohol_use}
-`.trim()
 }
