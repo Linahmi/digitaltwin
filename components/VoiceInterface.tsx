@@ -80,14 +80,7 @@ export function VoiceInterface({ onTranscript, isProcessing, responseText }: Voi
 
   useEffect(() => {
     if (responseText && !isProcessing) {
-      if (!('speechSynthesis' in window)) return
-      window.speechSynthesis.cancel()
-      const utt   = new SpeechSynthesisUtterance(responseText)
-      utt.rate    = 0.95
-      utt.pitch   = 1.0
-      utt.onstart = () => setIsSpeaking(true)
-      utt.onend   = () => setIsSpeaking(false)
-      window.speechSynthesis.speak(utt)
+      speak(responseText)
     }
   }, [responseText, isProcessing])
 
@@ -98,7 +91,6 @@ export function VoiceInterface({ onTranscript, isProcessing, responseText }: Voi
     else             { r.start(); setIsListening(true) }
   }
 
-<<<<<<< HEAD
   const getBestVoice = (): SpeechSynthesisVoice | null => {
     const voices = window.speechSynthesis.getVoices()
     if (!voices.length) return null
@@ -180,7 +172,7 @@ export function VoiceInterface({ onTranscript, isProcessing, responseText }: Voi
       setIsSpeaking(false)
     }
   }
-=======
+
   const disabled    = isProcessing || isSpeaking
   const micActive   = isListening
   const glowColor   = micActive ? 'rgba(0,229,255,0.55)' : 'rgba(0,229,255,0.25)'
@@ -191,7 +183,6 @@ export function VoiceInterface({ onTranscript, isProcessing, responseText }: Voi
     : isProcessing                ? 'Thinking…'
     : isSpeaking                  ? 'Speaking…'
     : 'Tap to speak with your twin'
->>>>>>> 525ed9c (feat: add landing page animations, voice interface enhancements, and synthetic FHIR patient data generation.)
 
   return (
     <div className="flex flex-col items-center gap-5">

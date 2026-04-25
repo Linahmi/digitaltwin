@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { VoiceInterface } from '@/components/VoiceInterface'
 import { MessageBubble } from '@/components/MessageBubble'
-<<<<<<< HEAD
 import { ChatMessage } from '@/types/patient'
 import { Activity, AlertCircle } from 'lucide-react'
 
@@ -14,9 +13,6 @@ interface PatientHeader {
   age: number | null
   gender: string | null
 }
-=======
-import { ChatMessage, Patient } from '@/types/patient'
->>>>>>> 525ed9c (feat: add landing page animations, voice interface enhancements, and synthetic FHIR patient data generation.)
 
 // ── Ambient AI presence (center glow + breathing circles) ────────────────────
 function AmbientPresence({ active }: { active: boolean }) {
@@ -129,12 +125,12 @@ function EmptyState() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function VoicePage() {
-<<<<<<< HEAD
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [patient, setPatient] = useState<PatientHeader | null>(null)
   const [currentResponse, setCurrentResponse] = useState<string>()
   const [dbError, setDbError] = useState<string | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   // ── Load patient from database on mount ───────────────────────────────────
   // No JSON file. Uses DEFAULT_PATIENT_ID env var or fetches the first
@@ -156,6 +152,13 @@ export default function VoicePage() {
       .catch(() => setDbError('Could not reach the patient API. Is the server running?'))
   }, [])
 
+  // Auto-scroll to latest message
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages])
+
   // ── Handle voice transcript → chat API ───────────────────────────────────
   const handleTranscript = async (transcript: string) => {
     if (!patient) return
@@ -166,54 +169,17 @@ export default function VoicePage() {
       timestamp: Date.now(),
     }
     setMessages(prev => [...prev, userMessage])
-=======
-  const [messages,       setMessages]       = useState<ChatMessage[]>([])
-  const [isProcessing,   setIsProcessing]   = useState(false)
-  const [patient,        setPatient]        = useState<Patient | null>(null)
-  const [currentResponse, setCurrentResponse] = useState<string>()
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    fetch('/patients/patient-001.json')
-      .then(r => r.json())
-      .then(d => setPatient(d))
-      .catch(e => console.error('Failed to load patient:', e))
-  }, [])
-
-  // Auto-scroll to latest message
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [messages])
-
-  const handleTranscript = async (transcript: string) => {
-    if (!patient) { alert('Patient data not loaded yet'); return }
-
-    const userMsg: ChatMessage = { role: 'user', content: transcript, timestamp: Date.now() }
-    setMessages(prev => [...prev, userMsg])
->>>>>>> 525ed9c (feat: add landing page animations, voice interface enhancements, and synthetic FHIR patient data generation.)
     setIsProcessing(true)
     setCurrentResponse(undefined)
 
     try {
-<<<<<<< HEAD
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // Send patientId only — the backend loads data from SQLite
         body: JSON.stringify({ message: transcript, patientId: patient.id }),
-=======
-      const res  = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: transcript, patientData: patient }),
->>>>>>> 525ed9c (feat: add landing page animations, voice interface enhancements, and synthetic FHIR patient data generation.)
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'API request failed')
 
-<<<<<<< HEAD
       const data = await response.json()
 
       if (!response.ok) {
@@ -235,24 +201,11 @@ export default function VoicePage() {
         timestamp: Date.now(),
       }
       setMessages(prev => [...prev, errorMessage])
-=======
-      const aiMsg: ChatMessage = { role: 'assistant', content: data.response, timestamp: Date.now() }
-      setMessages(prev => [...prev, aiMsg])
-      setCurrentResponse(data.response)
-    } catch (err) {
-      console.error('Chat error:', err)
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-        timestamp: Date.now(),
-      }])
->>>>>>> 525ed9c (feat: add landing page animations, voice interface enhancements, and synthetic FHIR patient data generation.)
     } finally {
       setIsProcessing(false)
     }
   }
 
-<<<<<<< HEAD
   // ── Empty database / setup required ──────────────────────────────────────
   if (dbError) {
     return (
@@ -270,7 +223,11 @@ export default function VoicePage() {
             <p className="mt-2 mb-1 text-slate-500"># Import into database</p>
             <p>bun run db:import</p>
           </div>
-=======
+        </div>
+      </div>
+    )
+  }
+
   // Loading screen
   if (!patient) {
     return (
@@ -288,52 +245,14 @@ export default function VoicePage() {
             }}
           />
           <p className="text-sm" style={{ color: 'rgba(0,229,255,0.5)' }}>
-            Loading your twin…
+            Loading your twin...
           </p>
->>>>>>> 525ed9c (feat: add landing page animations, voice interface enhancements, and synthetic FHIR patient data generation.)
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
 
-<<<<<<< HEAD
-  // ── Loading state ─────────────────────────────────────────────────────────
-  if (!patient) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex items-center gap-3 text-slate-400">
-          <Activity className="h-6 w-6 animate-pulse" />
-          <p>Loading patient from database...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Main UI ───────────────────────────────────────────────────────────────
-  return (
-    <div className="flex min-h-screen flex-col">
-      {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-900/50 px-6 py-4">
-        <div className="mx-auto max-w-4xl">
-          <h1 className="text-xl font-semibold">Digital Health Twin</h1>
-          <p className="text-sm text-slate-400">
-            {patient.firstName} {patient.lastName}
-            {patient.age !== null ? ` • ${patient.age} years old` : ''}
-            {patient.gender ? ` • ${patient.gender}` : ''}
-          </p>
-        </div>
-      </header>
-
-      {/* Chat messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-8">
-        <div className="mx-auto max-w-4xl space-y-6">
-          {messages.length === 0 ? (
-            <div className="text-center text-slate-500 py-12">
-              <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Ask your digital twin about your health</p>
-              <p className="text-sm mt-2">Try: &quot;What&apos;s my risk of heart disease?&quot;</p>
-=======
   const anyActive = isProcessing
 
   return (
@@ -356,7 +275,7 @@ export default function VoicePage() {
           Digital Health Twin
         </p>
         <p className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>
-          {patient.first_name} {patient.last_name} · {patient.vitals.age} yrs
+          {patient.firstName} {patient.lastName} {patient.age !== null ? `· ${patient.age} yrs` : ''}
         </p>
       </header>
 
@@ -369,7 +288,6 @@ export default function VoicePage() {
             <AmbientPresence active={anyActive} />
             <div className="relative z-10">
               <EmptyState />
->>>>>>> 525ed9c (feat: add landing page animations, voice interface enhancements, and synthetic FHIR patient data generation.)
             </div>
           </div>
         ) : (
@@ -413,17 +331,6 @@ export default function VoicePage() {
         )}
       </div>
 
-<<<<<<< HEAD
-      {/* Voice interface — fixed at bottom */}
-      <div className="border-t border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-6">
-        <div className="mx-auto max-w-4xl">
-          <VoiceInterface
-            onTranscript={handleTranscript}
-            isProcessing={isProcessing}
-            responseText={currentResponse}
-          />
-        </div>
-=======
       {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
       <div
         className="relative z-10 flex justify-center px-6 py-8"
@@ -434,7 +341,6 @@ export default function VoicePage() {
           isProcessing={isProcessing}
           responseText={currentResponse}
         />
->>>>>>> 525ed9c (feat: add landing page animations, voice interface enhancements, and synthetic FHIR patient data generation.)
       </div>
     </div>
   )
