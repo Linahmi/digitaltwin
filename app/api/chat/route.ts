@@ -8,6 +8,19 @@
  * No mock JSON. No patient data is accepted from the client.
  * If the database is empty or the patient is not found,
  * the API returns a clear error.
+ *
+ * ── Stateless health-data guarantee ──────────────────────────────────────────
+ * This route does NOT persist any patient health data.
+ * The only write it performs is to the `pubmed_cache` table, which stores
+ * scientific literature metadata (titles, abstracts, PMIDs) — never patient
+ * records or personally identifiable information.
+ *
+ * Patient context is read from SQLite on each request and discarded after the
+ * response is sent.  Nothing is logged, stored, or forwarded beyond what is
+ * required to generate a single AI response.
+ *
+ * The SQLite database is populated once from Synthea synthetic data
+ * (bun run db:import) and is never written to by user interactions.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
