@@ -24,11 +24,14 @@ export async function GET(request: NextRequest) {
     const topics = q.split(',').map(s => s.trim()).filter(Boolean)
     const formattedQuery = buildPubMedQuery(topics)
     
-    const citations = await getPubMedEvidence(formattedQuery)
+    const evidence = await getPubMedEvidence(formattedQuery)
 
     return NextResponse.json({
       query: formattedQuery,
-      citations
+      citations: evidence.citations,
+      cacheHit: evidence.cacheHit,
+      retrievedAt: evidence.retrievedAt,
+      staleCache: evidence.staleCache,
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })

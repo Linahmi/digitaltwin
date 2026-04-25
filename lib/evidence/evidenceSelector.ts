@@ -7,18 +7,57 @@
 
 import { getPubMedEvidence, Citation } from './pubmed'
 
+export interface EvidenceSelection {
+  topics: string[]
+  query: string
+  citations: Citation[]
+  cacheHit: boolean
+  retrievedAt: string | null
+  staleCache: boolean
+}
+
+function sanitizeTopic(topic: string): string {
+  return topic
+    .replace(/[\[\]()"']/g, ' ')
+    .replace(/\b(?:AND|OR|NOT)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function normalizeTopics(topics: string[]): string[] {
+  const seen = new Set<string>()
+  const normalized: string[] = []
+
+  for (const topic of topics) {
+    const cleaned = sanitizeTopic(topic)
+    const key = cleaned.toLowerCase()
+
+    if (!cleaned || seen.has(key)) continue
+    seen.add(key)
+    normalized.push(cleaned)
+  }
+
+  return normalized.slice(0, 3)
+}
+
 /**
  * Builds a structured PubMed query from user topics.
  * Focuses on guidelines, reviews, and meta-analyses.
  */
 export function buildPubMedQuery(topics: string[]): string {
-  const baseTopics = topics.join(' ')
+  const normalizedTopics = normalizeTopics(topics)
   // Restrict to English, human studies, and high-quality evidence types
-  // Limit to roughly the last 15 years using PubMed date syntax (e.g. 2010:3000[dp])
+  // Limit to roughly the last 15 years using PubMed date syntax.
   const currentYear = new Date().getFullYear()
   const startYear = currentYear - 15
-  
-  return `${baseTopics} (review[ptyp] OR systematic review[ptyp] OR meta-analysis[ptyp] OR guideline[ptyp]) AND humans[mh] AND english[la] AND ("${startYear}/01/01"[PDat] : "${currentYear}/12/31"[PDat])`
+
+  if (normalizedTopics.length === 0) return ''
+
+  const topicClause = normalizedTopics
+    .map(topic => `("${topic}"[Title/Abstract] OR "${topic}"[MeSH Terms])`)
+    .join(' OR ')
+
+  return `(${topicClause}) AND (guideline[Publication Type] OR meta-analysis[Publication Type] OR systematic[sb] OR review[Publication Type]) AND humans[MeSH Terms] AND english[Language] AND ("${startYear}/01/01"[PDat] : "${currentYear}/12/31"[PDat])`
 }
 
 /**
@@ -64,26 +103,49 @@ function scoreCitation(citation: Citation, topics: string[]): number {
 /**
  * Fetches and selects the top 2-3 most relevant citations for the given topics.
  */
-export async function getTopEvidence(topics: string[]): Promise<Citation[]> {
-  if (topics.length === 0) return []
+export async function getTopEvidence(topics: string[]): Promise<EvidenceSelection> {
+  const normalizedTopics = normalizeTopics(topics)
+  if (normalizedTopics.length === 0) {
+    return {
+      topics: [],
+      query: '',
+      citations: [],
+      cacheHit: false,
+      retrievedAt: null,
+      staleCache: false,
+    }
+  }
 
-  const query = buildPubMedQuery(topics)
+  const query = buildPubMedQuery(normalizedTopics)
   
   try {
-    const citations = await getPubMedEvidence(query)
+    const evidence = await getPubMedEvidence(query)
     
     // Score and sort
-    const scored = citations.map(c => ({
+    const scored = evidence.citations.map(c => ({
         ...c,
-        relevanceScore: scoreCitation(c, topics)
+        relevanceScore: scoreCitation(c, normalizedTopics)
     }))
 
     scored.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
 
-    // Return top 3
-    return scored.slice(0, 3)
+    return {
+      topics: normalizedTopics,
+      query,
+      citations: scored.slice(0, 3),
+      cacheHit: evidence.cacheHit,
+      retrievedAt: evidence.retrievedAt,
+      staleCache: evidence.staleCache,
+    }
   } catch (err) {
     console.error("Evidence selection failed:", err)
-    return []
+    return {
+      topics: normalizedTopics,
+      query,
+      citations: [],
+      cacheHit: false,
+      retrievedAt: null,
+      staleCache: false,
+    }
   }
 }

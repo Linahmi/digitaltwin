@@ -13,10 +13,70 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { buildSyntheaContext, getPatientSummary } from '@/lib/db/patientContext'
+import { getTopEvidence } from '@/lib/evidence/evidenceSelector'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
+
+interface EvidenceResponsePayload {
+  topics: string[]
+  query: string
+  evidenceStatus: 'ok' | 'stale-cache' | 'unavailable'
+  cacheHit: boolean
+  retrievedAt: string | null
+}
+
+function parseTopics(text: string): string[] {
+  const trimmed = text.trim()
+  if (!trimmed) return []
+
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === 'string')
+    }
+  } catch {
+    // Fall back to comma/newline parsing if the model returns invalid JSON.
+  }
+
+  return trimmed
+    .split(/[\n,]/)
+    .map(value => value.trim())
+    .filter(Boolean)
+}
+
+function buildEvidenceContext(citations: Array<{
+  title: string
+  journal: string
+  year: string
+  authors: string[]
+  abstract?: string
+  publicationTypes?: string[]
+}>): string {
+  return citations.map((citation, index) => {
+    const authorLine = citation.authors.length > 0
+      ? citation.authors.slice(0, 3).join(', ') + (citation.authors.length > 3 ? ' et al.' : '')
+      : 'Authors unavailable'
+    const publicationTypes = citation.publicationTypes?.length
+      ? ` Evidence type: ${citation.publicationTypes.slice(0, 2).join(', ')}.`
+      : ''
+    const abstractSnippet = citation.abstract
+      ? ` Abstract: ${citation.abstract.slice(0, 500)}${citation.abstract.length > 500 ? '…' : ''}`
+      : ''
+
+    return `${index + 1}. ${citation.title} (${citation.journal}, ${citation.year}). Authors: ${authorLine}.${publicationTypes}${abstractSnippet}`
+  }).join('\n')
+}
+
+function buildEvidenceUnavailableResponse(evidence: EvidenceResponsePayload) {
+  return NextResponse.json({
+    response: "I can't answer that safely right now because I couldn't retrieve verified PubMed evidence for your question.",
+    citations: [],
+    evidence,
+    grounded: false,
+  })
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,29 +124,45 @@ export async function POST(request: NextRequest) {
 
     // ── Extract topics & Fetch Evidence ──────────────────────────────────
     let citations: any[] = []
-    let evidenceContext = "No specific medical evidence retrieved."
+    let evidenceContext = ''
+    let evidence: EvidenceResponsePayload = {
+      topics: [],
+      query: '',
+      evidenceStatus: 'unavailable',
+      cacheHit: false,
+      retrievedAt: null,
+    }
 
     try {
       const topicResponse = await anthropic.messages.create({
         model: 'claude-3-haiku-20240307',
-        max_tokens: 50,
-        system: "You extract 1-3 key medical search topics from a user's question given their clinical context. Return ONLY a comma-separated list of search terms (e.g. 'hypertension, beta blockers'). Do not include conversational text.",
+        max_tokens: 100,
+        system: 'You extract 1-3 key medical search topics from a user question given brief patient context. Return ONLY a JSON array of short topic strings, for example ["hypertension", "beta blockers"].',
         messages: [{ role: 'user', content: `Patient context snippet:\n${patientContext.slice(0, 500)}\n\nUser question: ${message}` }],
       })
       const topicsText = topicResponse.content[0].type === 'text' ? topicResponse.content[0].text : ''
-      const topics = topicsText.split(',').map(s => s.trim()).filter(Boolean)
-      
-      const { getTopEvidence } = await import('@/lib/evidence/evidenceSelector')
-      citations = await getTopEvidence(topics)
+      const extractedTopics = parseTopics(topicsText)
+      const selectedEvidence = await getTopEvidence(extractedTopics)
 
-      if (citations.length > 0) {
-        evidenceContext = citations.map(c => 
-          `- ${c.title} (${c.journal}, ${c.year}). Authors: ${c.authors.slice(0, 3).join(', ')}${c.authors.length > 3 ? ' et al.' : ''}`
-        ).join('\n')
+      citations = selectedEvidence.citations
+      evidence = {
+        topics: selectedEvidence.topics,
+        query: selectedEvidence.query,
+        evidenceStatus: selectedEvidence.citations.length > 0
+          ? (selectedEvidence.staleCache ? 'stale-cache' : 'ok')
+          : 'unavailable',
+        cacheHit: selectedEvidence.cacheHit,
+        retrievedAt: selectedEvidence.retrievedAt,
       }
+
+      if (citations.length === 0) {
+        return buildEvidenceUnavailableResponse(evidence)
+      }
+
+      evidenceContext = buildEvidenceContext(citations)
     } catch (err) {
-      console.error("Failed to fetch evidence:", err)
-      evidenceContext = "References are temporarily unavailable due to a system error."
+      console.error('Failed to fetch evidence:', err)
+      return buildEvidenceUnavailableResponse(evidence)
     }
 
     // ── Build system prompt ───────────────────────────────────────────────
@@ -152,6 +228,8 @@ Respond as if speaking aloud.`
     return NextResponse.json({
       response: assistantMessage,
       citations,
+      evidence,
+      grounded: true,
       usage: response.usage,
     })
   } catch (error) {

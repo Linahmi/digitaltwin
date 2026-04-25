@@ -5,6 +5,7 @@ import { AlertCircle, UserCircle } from 'lucide-react'
 import Link from 'next/link'
 import { AdaptiveInsightFlow } from '@/components/voice/AdaptiveInsightFlow'
 import { DigitalTwinEye } from '@/components/voice/DigitalTwinEye'
+import { Citation } from '@/types/patient'
 import {
   getHealthDomain,
   PatientSnapshot,
@@ -17,6 +18,14 @@ interface Message {
   text: string
   domain?: Domain
   showAdaptiveFlow?: boolean
+  citations?: Citation[]
+  evidence?: {
+    topics: string[]
+    query: string
+    evidenceStatus: 'ok' | 'stale-cache' | 'unavailable'
+    cacheHit: boolean
+    retrievedAt: string | null
+  }
 }
 
 interface PatientHeader {
@@ -269,6 +278,8 @@ export default function VoicePage() {
         role: 'assistant', text: data.response,
         domain: domain ?? undefined,
         showAdaptiveFlow,
+        citations: data.citations ?? [],
+        evidence: data.evidence,
       }])
       await speak(data.response)
     } catch (err) {
@@ -556,6 +567,57 @@ export default function VoicePage() {
                       }}>
                         {msg.text}
                       </div>
+                      {(msg.evidence || (msg.citations && msg.citations.length > 0)) && (
+                        <div style={{
+                          marginTop: '0.75rem',
+                          background: 'rgba(255,255,255,0.78)',
+                          border: '1px solid rgba(14,165,233,0.12)',
+                          borderRadius: 14,
+                          padding: '0.875rem 1rem',
+                          textAlign: 'left',
+                        }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0f766e', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                            Evidence
+                          </div>
+                          {msg.evidence && (
+                            <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.6, marginBottom: msg.citations && msg.citations.length > 0 ? '0.75rem' : 0 }}>
+                              <div>
+                                Status: {msg.evidence.evidenceStatus === 'ok'
+                                  ? 'Verified PubMed evidence'
+                                  : msg.evidence.evidenceStatus === 'stale-cache'
+                                    ? 'Verified PubMed evidence from cache'
+                                    : 'Evidence unavailable'}
+                              </div>
+                              {msg.evidence.topics.length > 0 && (
+                                <div>Topics: {msg.evidence.topics.join(', ')}</div>
+                              )}
+                              {msg.evidence.query && (
+                                <div style={{ wordBreak: 'break-word' }}>Query: {msg.evidence.query}</div>
+                              )}
+                            </div>
+                          )}
+                          {msg.citations && msg.citations.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              {msg.citations.map((citation, citationIndex) => (
+                                <a
+                                  key={`${citation.pmid}-${citationIndex}`}
+                                  href={citation.url ?? `https://pubmed.ncbi.nlm.nih.gov/${citation.pmid}/`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    color: '#0284c7',
+                                    fontSize: '0.8rem',
+                                    lineHeight: 1.5,
+                                    textDecoration: 'none',
+                                  }}
+                                >
+                                  [{citationIndex + 1}] {citation.title} ({citation.year})
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {msg.showAdaptiveFlow && msg.domain && (
                         <AdaptiveInsightFlow
                           domain={msg.domain}

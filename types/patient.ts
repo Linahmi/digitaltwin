@@ -25,9 +25,14 @@ export interface ChatMessage {
 export interface Citation {
   pmid: string
   title: string
-  authors: string
+  authors: string[]
   journal: string
   year: string
+  url?: string
+  abstract?: string
+  publicationTypes?: string[]
+  evidenceType?: string
+  relevanceScore?: number
 }
 
 // ── Legacy types (kept for reference, not used in active code) ─────────────
