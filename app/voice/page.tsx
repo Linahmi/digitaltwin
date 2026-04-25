@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { VoiceInterface } from '@/components/VoiceInterface'
 import { MessageBubble } from '@/components/MessageBubble'
 import { ChatMessage } from '@/types/patient'
-import { Activity, AlertCircle } from 'lucide-react'
+import { Activity, AlertCircle, UserCircle } from 'lucide-react'
+import Link from 'next/link'
 
 interface PatientHeader {
   id: string
@@ -267,6 +268,16 @@ export default function VoicePage() {
         className="relative z-10 flex flex-col items-center py-6 px-6"
         style={{ borderBottom: '1px solid rgba(14,165,233,0.15)' }}
       >
+        <div className="absolute right-6 top-6">
+          <Link 
+            href="/profile" 
+            className="flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1.5 transition-all hover:bg-sky-50"
+            style={{ color: '#0284c7', border: '1px solid rgba(14,165,233,0.2)' }}
+          >
+            <UserCircle className="h-4 w-4" />
+            View Profile
+          </Link>
+        </div>
         <p
           className="text-[10px] font-semibold uppercase tracking-[0.35em] mb-1"
           style={{ color: '#0284c7' }}
