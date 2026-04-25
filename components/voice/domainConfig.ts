@@ -433,3 +433,338 @@ export const DEFAULT_SNAPSHOT: PatientSnapshot = {
   weight: 88, bmi: 27.5,
   glucose: 102, hba1c: 5.9,
 }
+
+// ── Board config types ────────────────────────────────────────────────────────
+
+export interface DriverWeight {
+  label:  string
+  value:  string   // display string, e.g. "158 mg/dL"
+  weight: number   // 0–100 normalised contribution
+}
+
+export interface BiomarkerSeries {
+  key:   string
+  label: string
+  color: string
+}
+
+export interface BoardConfig {
+  domainLabel:      string
+  mainMetricLabel:  string
+  trajectory:       { year: string; current: number }[]
+  baselineRisk:     number
+  projectedRisk10y: number
+  improvedRisk10y:  number
+  insight:          string
+  drivers:          DriverWeight[]
+  biomarkerTrend:   Record<string, string | number | null>[]
+  biomarkerSeries:  BiomarkerSeries[]
+  trendInsight:     string
+  simulations:      { id: string; label: string; riskReduction: number; note: string; why: string[] }[]
+  riskZones:        { low: [number, number]; moderate: [number, number]; high: [number, number] }
+}
+
+// ── Board config factory ──────────────────────────────────────────────────────
+
+export function getBoardConfigForDomain(domain: Domain, snapshot: PatientSnapshot | null): BoardConfig {
+  const snap = snapshot ?? DEFAULT_SNAPSHOT
+  switch (domain) {
+    case 'cardiovascular': return _cvConfig(snap)
+    case 'metabolic':      return _metConfig(snap)
+    case 'lifestyle':      return _lsConfig(snap)
+    case 'medication':     return _medConfig(snap)
+  }
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+function _trajectory(baseline: number, drift: number): { year: string; current: number }[] {
+  return [0, 2, 4, 6, 8, 10].map(y => ({
+    year:    y === 0 ? 'Now' : `+${y}y`,
+    current: Math.min(Math.round(baseline + drift * y), 90),
+  }))
+}
+
+function _normaliseDrivers(
+  raw: { label: string; value: string; score: number }[]
+): DriverWeight[] {
+  const valid = raw.filter(d => d.score > 0)
+  const total = valid.reduce((s, d) => s + d.score, 0) || 1
+  return valid
+    .map(d => ({ label: d.label, value: d.value, weight: Math.round((d.score / total) * 100) }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 4)
+}
+
+// ── Cardiovascular ────────────────────────────────────────────────────────────
+
+function _cvConfig(snap: PatientSnapshot): BoardConfig {
+  const baseline = cvBaseRisk(snap)
+  let drift = 0.5
+  if (snap.ldl        !== null && snap.ldl        >= 160) drift += 0.6
+  if (snap.systolicBP !== null && snap.systolicBP >= 140) drift += 0.5
+  if (snap.bmi        !== null && snap.bmi        >= 30)  drift += 0.4
+  if (snap.glucose    !== null && snap.glucose    >= 100) drift += 0.3
+
+  const trajectory      = _trajectory(baseline, drift)
+  const projectedRisk10y = trajectory[5].current
+  const improvedRisk10y  = Math.max(Math.round(baseline - 8), 5)
+
+  const raw = [
+    { label: 'LDL Cholesterol',
+      value: snap.ldl         !== null ? `${Math.round(snap.ldl)} mg/dL`         : '—',
+      score: snap.ldl === null ? 0 : snap.ldl >= 190 ? 8 : snap.ldl >= 160 ? 5 : snap.ldl >= 130 ? 3 : 1 },
+    { label: 'Blood Pressure',
+      value: snap.systolicBP  !== null ? `${Math.round(snap.systolicBP)} mmHg`   : '—',
+      score: snap.systolicBP === null ? 0 : snap.systolicBP >= 160 ? 8 : snap.systolicBP >= 140 ? 5 : snap.systolicBP >= 130 ? 3 : 1 },
+    { label: 'BMI / Weight',
+      value: snap.bmi         !== null ? `BMI ${snap.bmi.toFixed(1)}`            : '—',
+      score: snap.bmi === null ? 0 : snap.bmi >= 35 ? 6 : snap.bmi >= 30 ? 4 : snap.bmi >= 25 ? 2 : 0 },
+    { label: 'Glucose',
+      value: snap.glucose     !== null ? `${Math.round(snap.glucose)} mg/dL`     : '—',
+      score: snap.glucose === null ? 0 : snap.glucose >= 126 ? 5 : snap.glucose >= 100 ? 2 : 0 },
+    { label: 'Age risk',
+      value: snap.age         !== null ? `${snap.age} yrs`                       : '—',
+      score: snap.age === null ? 0 : snap.age >= 65 ? 4 : snap.age >= 55 ? 3 : snap.age >= 45 ? 2 : 0 },
+  ]
+
+  const ldlSpark = buildSparkline('ldl', snap)
+  const bpSpark  = buildSparkline('bp',  snap)
+  const biomarkerTrend = ldlSpark.map((pt, i) => ({
+    year: pt.t,
+    ldl:  pt.v,
+    bp:   bpSpark[i]?.v ?? null,
+  }))
+
+  const ldlStr = snap.ldl        !== null ? `LDL ${Math.round(snap.ldl)} mg/dL`        : 'cholesterol'
+  const bpStr  = snap.systolicBP !== null ? `BP ${Math.round(snap.systolicBP)} mmHg`   : 'blood pressure'
+
+  return {
+    domainLabel:      'Cardiovascular Health',
+    mainMetricLabel:  '10-Year CV Risk',
+    trajectory,
+    baselineRisk:     baseline,
+    projectedRisk10y,
+    improvedRisk10y,
+    insight:          `Current 10-year cardiovascular risk is ${baseline}%. Without intervention, projected to reach ${projectedRisk10y}% — driven primarily by elevated ${ldlStr} and ${bpStr}.`,
+    drivers:          _normaliseDrivers(raw),
+    biomarkerTrend,
+    biomarkerSeries:  [
+      { key: 'ldl', label: 'LDL (mg/dL)',  color: '#9E4848' },
+      { key: 'bp',  label: 'BP (mmHg)',    color: '#9D7A3E' },
+    ],
+    trendInsight:     'LDL and systolic blood pressure are both trending upward without intervention. Each 39 mg/dL reduction in LDL yields approximately 22% relative cardiovascular risk reduction.',
+    simulations: [
+      { id: 'lower_ldl', label: 'Lower LDL to 100 mg/dL', riskReduction: 7, note: '−58 mg/dL estimated',
+        why: ['LDL is the primary driver of arterial plaque formation', 'Each 39 mg/dL reduction lowers CVD risk by ~22%', 'Target <100 mg/dL protects even at high baseline risk'] },
+      { id: 'lose_10kg', label: 'Lose 10 kg',              riskReduction: 5, note: '−1 mmHg/kg weight loss',
+        why: ['Weight loss reduces systolic BP by ~1 mmHg per kg lost', 'Lowers LDL 5–8 mg/dL and raises HDL', 'Reduces visceral fat — a key driver of vascular inflammation'] },
+      { id: 'exercise',  label: 'Exercise 3×/week',         riskReduction: 5, note: 'improves HDL and BP',
+        why: ['Aerobic exercise raises HDL by 5–10% on average', 'Lowers resting systolic BP by 5–7 mmHg', 'Improves insulin sensitivity, reducing glucose-driven CV risk'] },
+      { id: 'diet',      label: 'Mediterranean diet',        riskReduction: 4, note: 'reduces LDL & inflammation',
+        why: ['Mediterranean diet reduces LDL by 10–15% in randomized trials', 'High omega-3 intake lowers triglycerides by 20–30%', 'Reduces C-reactive protein, a key marker of vascular inflammation'] },
+    ],
+    riskZones: { low: [0, 10], moderate: [10, 20], high: [20, 90] },
+  }
+}
+
+// ── Metabolic ─────────────────────────────────────────────────────────────────
+
+function _metConfig(snap: PatientSnapshot): BoardConfig {
+  const baseline = metBaseRisk(snap)
+  let drift = 1.0
+  if (snap.glucose !== null && snap.glucose >= 126) drift += 1.5
+  else if (snap.glucose !== null && snap.glucose >= 100) drift += 0.8
+  if (snap.hba1c !== null && snap.hba1c >= 6.5) drift += 1.2
+  else if (snap.hba1c !== null && snap.hba1c >= 5.7) drift += 0.6
+  if (snap.bmi !== null && snap.bmi >= 30) drift += 0.5
+
+  const trajectory      = _trajectory(baseline, drift)
+  const projectedRisk10y = trajectory[5].current
+  const improvedRisk10y  = Math.max(Math.round(baseline - 10), 5)
+
+  const raw = [
+    { label: 'Fasting Glucose',
+      value: snap.glucose !== null ? `${Math.round(snap.glucose)} mg/dL` : '—',
+      score: snap.glucose === null ? 0 : snap.glucose >= 126 ? 10 : snap.glucose >= 100 ? 6 : 1 },
+    { label: 'HbA1c',
+      value: snap.hba1c !== null ? `${snap.hba1c.toFixed(1)}%` : '—',
+      score: snap.hba1c === null ? 0 : snap.hba1c >= 6.5 ? 10 : snap.hba1c >= 5.7 ? 6 : 1 },
+    { label: 'BMI / Weight',
+      value: snap.bmi !== null ? `BMI ${snap.bmi.toFixed(1)}` : '—',
+      score: snap.bmi === null ? 0 : snap.bmi >= 35 ? 7 : snap.bmi >= 30 ? 5 : snap.bmi >= 25 ? 2 : 0 },
+    { label: 'Age risk',
+      value: snap.age !== null ? `${snap.age} yrs` : '—',
+      score: snap.age !== null && snap.age >= 45 ? 3 : 0 },
+  ]
+
+  const glucoseSpark = buildSparkline('glucose', snap)
+  const weightPts    = [0, 2, 4, 6, 8, 10].map(y => ({
+    t: y === 0 ? 'Now' : `+${y}y`,
+    v: Math.round((snap.weight ?? 85) + y * 0.7),
+  }))
+  const biomarkerTrend = glucoseSpark.map((pt, i) => ({
+    year:    pt.t,
+    glucose: pt.v,
+    weight:  weightPts[i]?.v ?? null,
+  }))
+
+  const gStr = snap.glucose !== null ? `glucose ${Math.round(snap.glucose)} mg/dL` : 'glucose levels'
+  const h1c  = snap.hba1c   !== null ? `HbA1c ${snap.hba1c.toFixed(1)}%`           : 'HbA1c'
+
+  return {
+    domainLabel:      'Metabolic Health',
+    mainMetricLabel:  'Diabetes Risk Score',
+    trajectory,
+    baselineRisk:     baseline,
+    projectedRisk10y,
+    improvedRisk10y,
+    insight:          `Estimated diabetes risk: ${baseline}%. With current ${gStr} and ${h1c}, the 10-year projection reaches ${projectedRisk10y}% without intervention.`,
+    drivers:          _normaliseDrivers(raw),
+    biomarkerTrend,
+    biomarkerSeries:  [
+      { key: 'glucose', label: 'Glucose (mg/dL)', color: '#9D7A3E' },
+      { key: 'weight',  label: 'Weight (kg)',      color: '#9E4848' },
+    ],
+    trendInsight:     'Fasting glucose and weight are both trending upward — a compounding signal of worsening insulin resistance. Early dietary intervention can significantly slow or reverse this progression.',
+    simulations: [
+      { id: 'diet',      label: 'Reduce refined carbohydrates', riskReduction: 8, note: '−10 mg/dL glucose est.',
+        why: ['Cutting refined carbs lowers fasting glucose by 10–20 mg/dL', 'Reduced glycemic load improves insulin response within weeks', 'High-fiber foods slow glucose absorption and reduce HbA1c'] },
+      { id: 'exercise',  label: 'Exercise 3×/week',             riskReduction: 7, note: '−0.5% HbA1c est.',
+        why: ['Muscle contractions increase glucose uptake independent of insulin', 'Regular activity lowers HbA1c by 0.5–1.0% over 3 months', 'Improves pancreatic beta-cell sensitivity to glucose'] },
+      { id: 'lose_10kg', label: 'Lose 10 kg',                   riskReduction: 9, note: '−15% glucose est.',
+        why: ['Weight loss of 7–10% reduces diabetes onset risk by ~58%', 'Lowers fasting glucose by 10–15 mg/dL on average', 'Reduces hepatic fat — the primary driver of insulin resistance'] },
+      { id: 'review',    label: 'Medication review',            riskReduction: 6, note: 'with physician',
+        why: ['Dose optimization can directly target HbA1c and fasting glucose', 'Regular monitoring catches worsening trends 3–6 months earlier', 'Physician-guided titration reduces side effects that cause discontinuation'] },
+    ],
+    riskZones: { low: [0, 15], moderate: [15, 30], high: [30, 90] },
+  }
+}
+
+// ── Lifestyle ─────────────────────────────────────────────────────────────────
+
+function _lsConfig(snap: PatientSnapshot): BoardConfig {
+  const baseline = Math.round((cvBaseRisk(snap) + metBaseRisk(snap)) / 2)
+  let drift = 0.8
+  if (snap.bmi     !== null && snap.bmi     >= 30)  drift += 0.5
+  if (snap.glucose !== null && snap.glucose >= 100) drift += 0.3
+  if (snap.ldl     !== null && snap.ldl     >= 130) drift += 0.3
+
+  const trajectory      = _trajectory(baseline, drift)
+  const projectedRisk10y = trajectory[5].current
+  const improvedRisk10y  = Math.max(Math.round(baseline - 8), 5)
+
+  const raw = [
+    { label: 'Physical Activity', value: 'Low activity', score: 7 },
+    { label: 'Diet Quality',      value: 'Suboptimal',   score: 6 },
+    { label: 'Sleep & Stress',   value: '62 / 100',      score: 5 },
+    { label: 'BMI / Weight',
+      value: snap.bmi !== null ? `BMI ${snap.bmi.toFixed(1)}` : '—',
+      score: snap.bmi === null ? 3 : snap.bmi >= 30 ? 7 : snap.bmi >= 25 ? 4 : 2 },
+    { label: 'LDL Cholesterol',
+      value: snap.ldl !== null ? `${Math.round(snap.ldl)} mg/dL` : '—',
+      score: snap.ldl !== null && snap.ldl >= 130 ? 4 : 0 },
+  ]
+
+  const bmiSpark  = buildSparkline('bmi', snap)
+  const weightPts = [0, 2, 4, 6, 8, 10].map(y => ({
+    t: y === 0 ? 'Now' : `+${y}y`,
+    v: Math.round((snap.weight ?? 85) + y * 0.7),
+  }))
+  const biomarkerTrend = bmiSpark.map((pt, i) => ({
+    year:   pt.t,
+    bmi:    pt.v,
+    weight: weightPts[i]?.v ?? null,
+  }))
+
+  return {
+    domainLabel:      'Lifestyle & General Health',
+    mainMetricLabel:  'Combined Health Risk',
+    trajectory,
+    baselineRisk:     baseline,
+    projectedRisk10y,
+    improvedRisk10y,
+    insight:          `Combined health risk: ${baseline}%. Physical activity, diet quality, and sleep are the primary modifiable levers. Without change, projected risk reaches ${projectedRisk10y}% in 10 years.`,
+    drivers:          _normaliseDrivers(raw),
+    biomarkerTrend,
+    biomarkerSeries:  [
+      { key: 'weight', label: 'Weight (kg)', color: '#9D7A3E' },
+      { key: 'bmi',    label: 'BMI',         color: '#9E4848' },
+    ],
+    trendInsight:     'Weight and BMI are trending upward without intervention. A 5–7% weight reduction through activity and dietary changes yields clinically meaningful improvements in cardiovascular and metabolic risk.',
+    simulations: [
+      { id: 'exercise',  label: 'Exercise 150 min/week', riskReduction: 6, note: '−CV risk, raises HDL',
+        why: ['150 min/week reduces all-cause mortality risk by ~30%', 'Raises HDL, lowers resting BP, and improves sleep quality', 'Each active day reduces BMI trajectory by 0.03–0.05 pts/year'] },
+      { id: 'diet',      label: 'Mediterranean diet',     riskReduction: 5, note: '−LDL, −inflammation',
+        why: ['Reduces LDL and systemic inflammation simultaneously', 'High polyphenol intake correlates with 25% lower CVD events', 'Reduces visceral fat without strict caloric restriction'] },
+      { id: 'sleep',     label: 'Improve sleep to 7h+',  riskReduction: 4, note: '−cortisol, −BP',
+        why: ['Sleep <6h raises cortisol and inflammatory markers by 20–30%', 'Improving to 7–8h lowers BP by 3–5 mmHg and reduces appetite hormones', 'Poor sleep accelerates weight gain and insulin resistance'] },
+      { id: 'lose_10kg', label: 'Lose 10 kg',            riskReduction: 7, note: '−BMI, −glucose risk',
+        why: ['5–10% weight reduction significantly lowers metabolic risk markers', 'Lowers blood pressure, glucose, and LDL simultaneously', 'Reduces BMI by ~3 points — often moving from obese to overweight'] },
+    ],
+    riskZones: { low: [0, 15], moderate: [15, 25], high: [25, 80] },
+  }
+}
+
+// ── Medication ────────────────────────────────────────────────────────────────
+
+function _medConfig(snap: PatientSnapshot): BoardConfig {
+  const ldlReduction = snap.ldl !== null ? Math.round(snap.ldl * 0.35) : 50
+  const baseline = 22
+
+  // Medication domain: risk decreases over time with adherence
+  const trajectory = [0, 2, 4, 6, 8, 10].map(y => ({
+    year:    y === 0 ? 'Now' : `+${y}y`,
+    current: Math.max(Math.round(baseline - y * 0.5), 8),
+  }))
+  const projectedRisk10y = trajectory[5].current
+  const improvedRisk10y  = Math.max(Math.round(baseline - 14), 5)
+
+  const raw = [
+    { label: 'Medication Adherence', value: '~75%',
+      score: 8 },
+    { label: 'LDL Monitoring',
+      value: snap.ldl        !== null ? `${Math.round(snap.ldl)} mg/dL`       : '—',
+      score: 6 },
+    { label: 'BP Control',
+      value: snap.systolicBP !== null ? `${Math.round(snap.systolicBP)} mmHg` : '—',
+      score: 5 },
+    { label: 'Scheduled Reviews', value: 'Irregular', score: 4 },
+  ]
+
+  const adherenceSpark = buildSparkline('adherence', snap)
+  const benefitSpark   = buildSparkline('benefit',   snap)
+  const biomarkerTrend = adherenceSpark.map((pt, i) => ({
+    year:      pt.t,
+    adherence: pt.v,
+    benefit:   benefitSpark[i]?.v ?? null,
+  }))
+
+  return {
+    domainLabel:      'Medication & Treatment',
+    mainMetricLabel:  'Treatment Risk Score',
+    trajectory,
+    baselineRisk:     baseline,
+    projectedRisk10y,
+    improvedRisk10y,
+    insight:          `With consistent adherence, LDL could be reduced by approximately ${ldlReduction} mg/dL. Current ~75% adherence leaves significant therapeutic benefit unrealized.`,
+    drivers:          _normaliseDrivers(raw),
+    biomarkerTrend,
+    biomarkerSeries:  [
+      { key: 'adherence', label: 'Adherence (%)',  color: '#4472B8' },
+      { key: 'benefit',   label: 'Benefit Score',  color: '#5C7A5C' },
+    ],
+    trendInsight:     'Adherence trends downward over time without active support, while therapeutic benefit compounds upward with consistency. Daily reminders and quarterly reviews significantly improve both metrics.',
+    simulations: [
+      { id: 'reminders',  label: 'Daily medication reminders', riskReduction: 5, note: '+15% adherence est.',
+        why: ['Adherence above 90% reduces cardiovascular events by 25–35%', 'Daily reminders increase medication adherence by 15–20%', 'Consistent dosing maintains steady therapeutic drug levels'] },
+      { id: 'organizer',  label: 'Pill organizer or app',      riskReduction: 4, note: '+10% adherence est.',
+        why: ['Visual tracking reduces missed doses by 40–60%', 'Organizers reduce errors common with multi-drug regimens', 'Structured routine improves consistency of statin and antihypertensive use'] },
+      { id: 'lab_review', label: 'Regular lab reviews',        riskReduction: 3, note: 'early detection',
+        why: ['Quarterly labs catch LDL rebound or BP drift 3–6 months earlier', 'Lab reviews correlate with 15% better long-term adherence', 'Proactive monitoring prevents gaps in therapy optimization'] },
+      { id: 'dose_opt',   label: 'Dose optimization',          riskReduction: 6, note: 'with physician',
+        why: ['Dose optimization improves LDL response by an additional 30–40%', 'Statin intensification often needed as baseline risk evolves with age', 'Physician-guided titration reduces side effects that cause discontinuation'] },
+    ],
+    riskZones: { low: [0, 8], moderate: [8, 18], high: [18, 40] },
+  }
+}
