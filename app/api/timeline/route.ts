@@ -1,22 +1,79 @@
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  // Static mock timeline data according to user request
-  const mockData = {
-    historical: [
-      { date: "2022", cholesterol: 200, systolic: 155, diastolic: 95, weight: 85 },
-      { date: "2023", cholesterol: 185, systolic: 150, diastolic: 94, weight: 88 },
-      { date: "2024", cholesterol: 175, systolic: 148, diastolic: 93, weight: 90 },
-      { date: "2025", cholesterol: 165, systolic: 145, diastolic: 92, weight: 92 },
-    ],
-    predicted: [
-      { date: "2025", cholesterol: 165, systolic: 145, diastolic: 92, weight: 92 }, // Overlap point
-      { date: "2026", cholesterol: 160, systolic: 144, diastolic: 91, weight: 94 },
-      { date: "2027", cholesterol: 158, systolic: 146, diastolic: 91, weight: 95 },
-      { date: "2028", cholesterol: 155, systolic: 147, diastolic: 92, weight: 97 },
-      { date: "2029", cholesterol: 152, systolic: 148, diastolic: 93, weight: 99 },
-    ]
+  const data = {
+    biomarkers: {
+      cholesterol: {
+        label: "LDL Cholesterol",
+        unit: "mg/dL",
+        zones: {
+          optimal: [0, 100],
+          borderline: [100, 160],
+          elevated: [160, 300]
+        },
+        historical: [
+          { date: "2022", value: 200 },
+          { date: "2023", value: 180 },
+          { date: "2024", value: 172 },
+          { date: "2025", value: 165 }
+        ],
+        predicted: [
+          { date: "2025", value: 165 },
+          { date: "2026", value: 158 },
+          { date: "2027", value: 154 },
+          { date: "2028", value: 150 },
+          { date: "2029", value: 147 },
+          { date: "2030", value: 145 }
+        ]
+      },
+      blood_pressure: {
+        label: "Systolic Blood Pressure",
+        unit: "mmHg",
+        zones: {
+          optimal: [0, 120],
+          borderline: [120, 140],
+          elevated: [140, 200]
+        },
+        historical: [
+          { date: "2022", value: 155 },
+          { date: "2023", value: 149 },
+          { date: "2024", value: 146 },
+          { date: "2025", value: 145 }
+        ],
+        predicted: [
+          { date: "2025", value: 145 },
+          { date: "2026", value: 144 },
+          { date: "2027", value: 145 },
+          { date: "2028", value: 146 },
+          { date: "2029", value: 148 },
+          { date: "2030", value: 148 }
+        ]
+      },
+      weight: {
+        label: "Body Weight",
+        unit: "kg",
+        zones: {
+          optimal: [0, 75],
+          borderline: [75, 90],
+          elevated: [90, 150]
+        },
+        historical: [
+          { date: "2022", value: 85 },
+          { date: "2023", value: 88 },
+          { date: "2024", value: 90 },
+          { date: "2025", value: 92 }
+        ],
+        predicted: [
+          { date: "2025", value: 92 },
+          { date: "2026", value: 93 },
+          { date: "2027", value: 95 },
+          { date: "2028", value: 96 },
+          { date: "2029", value: 97 },
+          { date: "2030", value: 98 }
+        ]
+      }
+    }
   }
 
-  return NextResponse.json(mockData)
+  return NextResponse.json(data)
 }

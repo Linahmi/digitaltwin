@@ -14,14 +14,11 @@ export function ConditionsList({ conditions }: ConditionsListProps) {
   return (
     <div className="flex flex-col bg-white border border-[#E5E5E5] rounded-lg h-full overflow-hidden">
       <div className="px-5 py-4 border-b border-[#E5E5E5]">
-        <h3 className="text-xs uppercase tracking-widest text-[#999] font-normal">Active Conditions</h3>
+        <h3 className="text-sm font-medium text-[#1a1a1a]">Active Conditions</h3>
       </div>
       
       <div className="flex flex-col overflow-y-auto">
         {conditions.map((condition, idx) => {
-          const isActive = condition.status === 'active' || condition.status === 'Optimal'
-          const badgeColor = isActive ? 'text-emerald-500' : 'text-[#999]'
-          
           return (
             <div 
               key={idx} 
@@ -35,7 +32,7 @@ export function ConditionsList({ conditions }: ConditionsListProps) {
               </div>
               
               <div>
-                <span className={`text-xs font-normal uppercase tracking-widest ${badgeColor}`}>
+                <span className="text-xs font-normal text-[#999] capitalize">
                   {condition.status}
                 </span>
               </div>

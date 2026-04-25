@@ -4,6 +4,7 @@ import { BiomarkerCard } from '@/components/profile/BiomarkerCard'
 import { AIInsightCard } from '@/components/profile/AIInsightCard'
 import { ConditionsList, Condition } from '@/components/profile/ConditionsList'
 import { MedicationsList, Medication } from '@/components/profile/MedicationsList'
+import { ConsentCard } from '@/components/web3/ConsentCard'
 import { TopNav } from '@/components/TopNav'
 import { Patient } from '@/types/patient'
 
@@ -113,7 +114,7 @@ export default function ProfilePage() {
           </div>
           
           {/* AI Insight Cards (Horizontal Row) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <AIInsightCard 
               title="Cardiovascular"
               metric="14%"
@@ -159,13 +160,18 @@ export default function ProfilePage() {
         </section>
 
         {/* Conditions & Medications */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
           <div className="h-[300px]">
             <ConditionsList conditions={(conditions || []) as Condition[]} />
           </div>
           <div className="h-[300px]">
             <MedicationsList medications={(medications || []) as Medication[]} />
           </div>
+        </section>
+
+        {/* Web3 Consent Layer */}
+        <section className="mb-8">
+          <ConsentCard />
         </section>
 
       </main>

@@ -18,16 +18,15 @@ export function AIInsightCard({ title, metric, description, severity }: AIInsigh
   }
 
   return (
-    <div className="flex flex-col gap-2 bg-white border border-[#E5E5E5] rounded-lg p-5">
-      <h4 className="text-xs uppercase tracking-widest text-[#999] font-normal mb-1">{title}</h4>
+    <div className="flex flex-col bg-white border border-[#E5E5E5] rounded-lg p-5 h-full">
+      <h4 className="text-xs uppercase tracking-widest text-[#999] font-medium mb-2">{title}</h4>
       
       <span className={`text-2xl font-light ${colorClass}`}>{metric}</span>
 
-      <p className="text-sm text-[#777] font-normal leading-relaxed pb-3 mt-1">
+      <p className="text-sm text-[#777] font-normal leading-relaxed mt-2 pb-4">
         {description}
       </p>
 
-      {/* subtile ligne colorée */}
       <div className="mt-auto">
         <div className={`h-[2px] w-16 ${bgColor}`} />
       </div>

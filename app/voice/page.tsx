@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, UserCircle } from 'lucide-react'
+import Link from 'next/link'
+import { GuidedFutureFlow } from '@/components/voice/GuidedFutureFlow'
 
 interface PatientHeader {
   id: string
@@ -9,6 +11,116 @@ interface PatientHeader {
   lastName: string
   age: number | null
   gender: string | null
+}
+
+interface PatientBiomarkersRaw {
+  patientId: string
+  age: number | null
+  gender: string | null
+  ldl: number | null
+  hdl: number | null
+  systolicBP: number | null
+  diastolicBP: number | null
+  weight: number | null
+  bmi: number | null
+  glucose: number | null
+  hba1c: number | null
+  cardiovascularRiskFactors: string[]
+}
+
+interface ProjectionState {
+  baselineRisk: number
+  projectedRisk10y: number
+  improvedRisk10y: number
+  trajectory: { year: string; current: number; improved?: number }[]
+  drivers: string[]
+  ldlCurrent: number | null
+  bpCurrent: number | null
+  weightCurrent: number | null
+}
+
+function computeBaselineRisk(bm: PatientBiomarkersRaw): number {
+  let score = 5
+  if (bm.age) {
+    if (bm.age >= 60) score += 6
+    else if (bm.age >= 50) score += 4
+    else if (bm.age >= 40) score += 2
+  }
+  if (bm.gender === 'male') score += 2
+  if (bm.ldl !== null) {
+    if (bm.ldl >= 190) score += 6
+    else if (bm.ldl >= 160) score += 4
+    else if (bm.ldl >= 130) score += 2
+  }
+  if (bm.hdl !== null) {
+    if (bm.hdl < 35) score += 4
+    else if (bm.hdl < 40) score += 2
+    else if (bm.hdl >= 60) score -= 2
+  }
+  if (bm.systolicBP !== null) {
+    if (bm.systolicBP >= 160) score += 6
+    else if (bm.systolicBP >= 140) score += 4
+    else if (bm.systolicBP >= 130) score += 2
+  }
+  if (bm.bmi !== null) {
+    if (bm.bmi >= 35) score += 4
+    else if (bm.bmi >= 30) score += 3
+    else if (bm.bmi >= 25) score += 1
+  }
+  if (bm.glucose !== null) {
+    if (bm.glucose >= 126) score += 4
+    else if (bm.glucose >= 100) score += 2
+  }
+  if (bm.hba1c !== null) {
+    if (bm.hba1c >= 6.5) score += 4
+    else if (bm.hba1c >= 5.7) score += 2
+  }
+  return Math.min(Math.round(score), 50)
+}
+
+function buildProjection(bm: PatientBiomarkersRaw): ProjectionState {
+  const baseline = computeBaselineRisk(bm)
+
+  let drift = 0.5
+  if (bm.ldl !== null && bm.ldl >= 160) drift += 0.6
+  if (bm.systolicBP !== null && bm.systolicBP >= 140) drift += 0.5
+  if (bm.bmi !== null && bm.bmi >= 30) drift += 0.4
+  if (bm.glucose !== null && bm.glucose >= 100) drift += 0.3
+
+  let improvedDrift = 0.1
+  if (bm.ldl !== null && bm.ldl >= 160) improvedDrift -= 0.2
+  if (bm.systolicBP !== null && bm.systolicBP >= 140) improvedDrift -= 0.1
+  improvedDrift = Math.max(improvedDrift, -0.3)
+
+  const years = [0, 2, 4, 6, 8, 10]
+  const trajectory = years.map(y => ({
+    year: y === 0 ? 'Today' : `${y} yrs`,
+    current: Math.min(Math.round(baseline + drift * y), 75),
+    improved: Math.max(Math.round(baseline + improvedDrift * y), 5),
+  }))
+
+  const projectedRisk10y = trajectory[5].current
+  const improvedRisk10y = trajectory[5].improved!
+
+  const drivers: string[] = []
+  if (bm.ldl !== null && bm.ldl >= 130) drivers.push(`LDL ${Math.round(bm.ldl)} mg/dL`)
+  if (bm.systolicBP !== null && bm.systolicBP >= 130) drivers.push(`BP ${Math.round(bm.systolicBP)}/${bm.diastolicBP ? Math.round(bm.diastolicBP) : '?'} mmHg`)
+  if (bm.bmi !== null && bm.bmi >= 25) drivers.push(`BMI ${bm.bmi.toFixed(1)}`)
+  if (bm.glucose !== null && bm.glucose >= 100) drivers.push(`Glucose ${Math.round(bm.glucose)} mg/dL`)
+
+  return { trajectory, baselineRisk: baseline, projectedRisk10y, improvedRisk10y, drivers, ldlCurrent: bm.ldl, bpCurrent: bm.systolicBP, weightCurrent: bm.weight }
+}
+
+const FUTURE_KEYWORDS = [
+  'will happen', 'in 10 years', 'in 5 years', 'future', 'if i keep',
+  'long term', 'long-term', 'trajectory', 'prediction', 'predict',
+  'risk in', 'over time', 'eventually', '10 year', '5 year',
+  'next decade', 'diet', 'lifestyle', 'keep eating', 'continue',
+]
+
+function isFutureQuestion(text: string): boolean {
+  const lower = text.toLowerCase()
+  return FUTURE_KEYWORDS.some(kw => lower.includes(kw))
 }
 
 const SUGGESTIONS = [
@@ -19,18 +131,19 @@ const SUGGESTIONS = [
 ]
 
 export default function VoicePage() {
-  const [patient, setPatient]       = useState<PatientHeader | null>(null)
-  const [dbError, setDbError]       = useState<string | null>(null)
+  const [patient, setPatient]         = useState<PatientHeader | null>(null)
+  const [dbError, setDbError]         = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSpeaking, setIsSpeaking]   = useState(false)
   const [statusText, setStatusText]   = useState('Talk to me')
+  const [projection, setProjection]   = useState<ProjectionState | null>(null)
+  const [showFuturePanel, setShowFuturePanel] = useState(false)
   const recognitionRef = useRef<any>(null)
 
   // Keep a stable ref to the latest handleTranscript so recognition doesn't need to re-init
   const handleTranscriptRef = useRef<(text: string) => void>(() => {})
 
-  // ── Load patient ────────────────────────────────────────────────────────────
   useEffect(() => {
     const patientId = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_ID ?? ''
     const url = patientId ? `/api/patient?id=${patientId}` : '/api/patient'
@@ -39,6 +152,14 @@ export default function VoicePage() {
         const data = await res.json()
         if (!res.ok) { setDbError(data.error ?? 'Failed to load patient'); return }
         setPatient(data)
+
+        // Fetch biomarkers and compute projection
+        const bioUrl = patientId ? `/api/biomarkers?id=${patientId}` : '/api/biomarkers'
+        const bioRes = await fetch(bioUrl)
+        if (bioRes.ok) {
+          const bm: PatientBiomarkersRaw = await bioRes.json()
+          setProjection(buildProjection(bm))
+        }
       })
       .catch(() => setDbError('Could not reach the patient API. Is the server running?'))
   }, [])
@@ -109,6 +230,7 @@ export default function VoicePage() {
   // ── Chat API call ───────────────────────────────────────────────────────────
   const handleTranscript = useCallback(async (transcript: string) => {
     if (!patient) return
+    const triggered = isFutureQuestion(transcript)
     setIsProcessing(true)
     try {
       const res  = await fetch('/api/chat', {
@@ -118,6 +240,7 @@ export default function VoicePage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'API request failed')
+      if (triggered) setShowFuturePanel(true)
       await speak(data.response)
     } catch (err) {
       console.error('Chat error:', err)
@@ -154,12 +277,7 @@ export default function VoicePage() {
           <h1 className="mb-3 text-xl font-semibold text-white">Database Setup Required</h1>
           <p className="mb-6 text-slate-400">{dbError}</p>
           <div className="rounded-lg border border-slate-700 bg-slate-900 p-4 text-left text-sm font-mono text-slate-300">
-            <p className="mb-1 text-slate-500"># Download and run Synthea</p>
-            <p>java -jar synthea.jar -p 10</p>
-            <p className="mt-2 mb-1 text-slate-500"># Move output to expected folder</p>
-            <p>New-Item -ItemType Directory -Force -Path public\synthea</p>
-            <p>Move-Item -Path output\fhir -Destination public\synthea\ -Force</p>
-            <p className="mt-2 mb-1 text-slate-500"># Import into database</p>
+            <p className="mb-1 text-slate-500"># Import into database</p>
             <p>bun run db:import</p>
           </div>
         </div>
@@ -273,6 +391,16 @@ export default function VoicePage() {
             {patient.firstName} {patient.lastName}{patient.age !== null ? ` · ${patient.age} yrs` : ''}
           </div>
         </div>
+
+        {/* ── View Profile link ───────────────────────────────────────────────── */}
+        <Link
+          href="/profile"
+          className="absolute top-12 right-6 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all hover:bg-sky-50"
+          style={{ color: '#0284c7', border: '1px solid rgba(14,165,233,0.2)' }}
+        >
+          <UserCircle className="h-4 w-4" />
+          View Profile
+        </Link>
 
         {/* ── Voice interface ─────────────────────────────────────────────────── */}
         <div className="flex flex-col items-center text-center" style={{ maxWidth: 700 }}>
@@ -428,6 +556,22 @@ export default function VoicePage() {
               </button>
             ))}
           </div>
+
+          {/* Future risk panel — shown after a future-oriented question */}
+          {showFuturePanel && projection && (
+            <div style={{ marginTop: '2.5rem', width: '100%', maxWidth: 750 }}>
+              <GuidedFutureFlow
+                baselineRisk={projection.baselineRisk}
+                projectedRisk10y={projection.projectedRisk10y}
+                improvedRisk10y={projection.improvedRisk10y}
+                trajectory={projection.trajectory}
+                drivers={projection.drivers}
+                ldlCurrent={projection.ldlCurrent}
+                bpCurrent={projection.bpCurrent}
+                weightCurrent={projection.weightCurrent}
+              />
+            </div>
+          )}
         </div>
 
         {/* ── Footer ─────────────────────────────────────────────────────────── */}

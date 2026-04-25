@@ -1,141 +1,102 @@
 'use client'
 
-import React, { useMemo } from 'react'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ReferenceArea,
-  ResponsiveContainer
-} from 'recharts'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceArea } from 'recharts'
 
-interface TimelineDataPoint {
-  date: string
-  cholesterol: number
-  systolic: number
-  diastolic: number
-  weight: number
-  isPrediction?: boolean
-}
-
-interface BiomarkerTimelineChartProps {
-  data: TimelineDataPoint[]
-  metric: 'cholesterol' | 'bp' | 'weight'
-}
-
-export function BiomarkerTimelineChart({ data, metric }: BiomarkerTimelineChartProps) {
-  
-  // Dynamic zones based on metric
-  const zones = useMemo(() => {
-    if (metric === 'cholesterol') {
-      return [
-        { y1: 0, y2: 130, color: 'rgba(16, 185, 129, 0.08)' }, // Optimal
-        { y1: 130, y2: 160, color: 'rgba(245, 158, 11, 0.08)' }, // Borderline
-        { y1: 160, y2: 300, color: 'rgba(239, 68, 68, 0.08)' }  // Elevated
-      ]
-    }
-    if (metric === 'bp') {
-      return [
-        { y1: 60, y2: 120, color: 'rgba(16, 185, 129, 0.08)' }, // Optimal
-        { y1: 120, y2: 140, color: 'rgba(245, 158, 11, 0.08)' }, // Borderline
-        { y1: 140, y2: 200, color: 'rgba(239, 68, 68, 0.08)' } // Elevated
-      ]
-    }
-    // Weight depends on height but using static boundaries here for demo
-    return [
-      { y1: 60, y2: 83, color: 'rgba(16, 185, 129, 0.08)' },
-      { y1: 83, y2: 90, color: 'rgba(245, 158, 11, 0.08)' },
-      { y1: 90, y2: 150, color: 'rgba(239, 68, 68, 0.08)' }
-    ]
-  }, [metric])
-
-  const formatTooltip = (value: number, name: string) => {
-    if (name === 'cholesterol') return [`${value} mg/dL`, 'Cholesterol']
-    if (name === 'systolic') return [`${value}`, 'Systolic BP']
-    if (name === 'diastolic') return [`${value}`, 'Diastolic BP']
-    if (name === 'weight') return [`${value} kg`, 'Weight']
-    return [value, name]
+interface BiomarkerChartProps {
+  data: {
+    historical: { date: string, value: number | null }[]
+    predicted: { date: string, value: number | null }[]
+    zones: { optimal: [number, number], borderline: [number, number], elevated: [number, number] }
   }
+}
 
-  // Pre-process data so that solid and dashed lines overlap exactly and don't look weird
-  // If we want solid and dashed on the same series, Recharts requires a custom dot or split series.
-  // The easiest way is to push mapping onto different keys.
-  const chartData = useMemo(() => {
-    return data.map(d => {
-      const isPred = d.isPrediction
-      return {
-        date: d.date,
-        cholesterol_hist: isPred ? null : d.cholesterol,
-        cholesterol_pred: isPred && d.cholesterol ? d.cholesterol : null,
-        
-        systolic_hist: isPred ? null : d.systolic,
-        systolic_pred: isPred && d.systolic ? d.systolic : null,
-        
-        diastolic_hist: isPred ? null : d.diastolic,
-        diastolic_pred: isPred && d.diastolic ? d.diastolic : null,
-        
-        weight_hist: isPred ? null : d.weight,
-        weight_pred: isPred && d.weight ? d.weight : null,
-      }
-    })
-  }, [data])
+export function BiomarkerTimelineChart({ data }: BiomarkerChartProps) {
+  // Merge historical and predicted into a single array for Recharts
+  const allDates = Array.from(new Set([
+    ...data.historical.map(d => d.date),
+    ...data.predicted.map(d => d.date)
+  ])).sort()
+
+  const chartData = allDates.map(date => {
+    const hist = data.historical.find(d => d.date === date)
+    const pred = data.predicted.find(d => d.date === date)
+    return {
+      date,
+      historicalValue: hist ? hist.value : null,
+      predictedValue: pred ? pred.value : null
+    }
+  })
+
+  // To prevent chart clipping, find domain min/max
+  const values = chartData.flatMap(d => [d.historicalValue, d.predictedValue]).filter((v): v is number => v !== null)
+  const minVal = Math.min(...values)
+  const maxVal = Math.max(...values)
+  const YDomain = [Math.floor(minVal * 0.9), Math.ceil(maxVal * 1.1)]
 
   return (
     <div className="w-full h-[400px]">
+      <div className="flex items-center gap-6 mb-2 text-xs font-medium text-[#777]">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-[2px] bg-[#3B82F6]" />
+          <span>HISTORICAL</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-[2px] border-t-2 border-dashed border-[#3B82F6] opacity-50" />
+          <span>PREDICTED</span>
+        </div>
+      </div>
+      
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+        <LineChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" vertical={false} />
+          
+          <ReferenceArea y1={data.zones.optimal[0]} y2={data.zones.optimal[1]} fill="#10b98120" />
+          <ReferenceArea y1={data.zones.borderline[0]} y2={data.zones.borderline[1]} fill="#f59e0b15" />
+          <ReferenceArea y1={data.zones.elevated[0]} y2={data.zones.elevated[1]} fill="#ef444415" />
+
           <XAxis 
             dataKey="date" 
             axisLine={false} 
             tickLine={false} 
-            tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
+            tick={{ fill: '#999', fontSize: 12 }} 
             dy={10}
           />
           <YAxis 
+            domain={YDomain} 
             axisLine={false} 
-            tickLine={false}
-            tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
-            domain={['auto', 'auto']}
+            tickLine={false} 
+            tick={{ fill: '#999', fontSize: 12 }}
+            dx={-10}
           />
-          <Tooltip 
-            formatter={formatTooltip}
-            contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-          />
-          <Legend wrapperStyle={{ paddingTop: '20px' }} />
           
-          {zones.map((zone, i) => (
-            <ReferenceArea key={i} y1={zone.y1} y2={zone.y2} fill={zone.color} strokeOpacity={0} />
-          ))}
+          <Tooltip 
+            contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #E5E5E5', boxShadow: 'none' }}
+            itemStyle={{ color: '#1a1a1a', fontSize: '14px', fontWeight: 500 }}
+            labelStyle={{ color: '#999', fontSize: '12px', marginBottom: '4px' }}
+          />
 
-          {metric === 'cholesterol' && (
-            <>
-              <Line type="monotone" dataKey="cholesterol_hist" name="Cholesterol (Historical)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} connectNulls />
-              <Line type="monotone" dataKey="cholesterol_pred" name="Cholesterol (Predicted)" stroke="#3b82f6" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4 }} connectNulls />
-            </>
-          )}
-
-          {metric === 'bp' && (
-            <>
-              <Line type="monotone" dataKey="systolic_hist" name="Systolic (Historical)" stroke="#db2777" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} connectNulls />
-              <Line type="monotone" dataKey="systolic_pred" name="Systolic (Predicted)" stroke="#db2777" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4 }} connectNulls />
-              
-              <Line type="monotone" dataKey="diastolic_hist" name="Diastolic (Historical)" stroke="#9333ea" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} connectNulls />
-              <Line type="monotone" dataKey="diastolic_pred" name="Diastolic (Predicted)" stroke="#9333ea" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4 }} connectNulls />
-            </>
-          )}
-
-          {metric === 'weight' && (
-            <>
-              <Line type="monotone" dataKey="weight_hist" name="Weight (Historical)" stroke="#14b8a6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} connectNulls />
-              <Line type="monotone" dataKey="weight_pred" name="Weight (Predicted)" stroke="#14b8a6" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4 }} connectNulls />
-            </>
-          )}
-
+          <Line 
+            type="monotone" 
+            dataKey="historicalValue" 
+            stroke="#3B82F6" 
+            strokeWidth={2} 
+            dot={{ r: 3, fill: '#3B82F6', strokeWidth: 0 }} 
+            activeDot={{ r: 5 }} 
+            isAnimationActive={false}
+            name="Recorded"
+          />
+          
+          <Line 
+            type="monotone" 
+            dataKey="predictedValue" 
+            stroke="#3B82F6" 
+            strokeWidth={2} 
+            strokeDasharray="8 4" 
+            dot={false} 
+            opacity={0.5}
+            isAnimationActive={false}
+            name="Projected"
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>
