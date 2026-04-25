@@ -5,6 +5,12 @@ import { AlertCircle, UserCircle } from 'lucide-react'
 import Link from 'next/link'
 import { GuidedFutureFlow } from '@/components/voice/GuidedFutureFlow'
 
+interface Message {
+  role: 'user' | 'assistant'
+  text: string
+  guidedFlow?: boolean
+}
+
 interface PatientHeader {
   id: string
   firstName: string
@@ -138,11 +144,11 @@ export default function VoicePage() {
   const [isSpeaking, setIsSpeaking]   = useState(false)
   const [statusText, setStatusText]   = useState('Talk to me')
   const [projection, setProjection]   = useState<ProjectionState | null>(null)
-  const [showFuturePanel, setShowFuturePanel] = useState(false)
+  const [messages, setMessages]       = useState<Message[]>([])
   const recognitionRef = useRef<any>(null)
 
-  // Keep a stable ref to the latest handleTranscript so recognition doesn't need to re-init
-  const handleTranscriptRef = useRef<(text: string) => void>(() => {})
+  // Stable ref so speech recognition always calls the latest handleUserMessage
+  const handleUserMessageRef = useRef<(text: string) => void>(() => {})
 
   useEffect(() => {
     const patientId = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_ID ?? ''
@@ -175,7 +181,7 @@ export default function VoicePage() {
     recog.lang           = 'en-US'
     recog.onresult = (e: any) => {
       setIsListening(false)
-      handleTranscriptRef.current(e.results[0][0].transcript)
+      handleUserMessageRef.current(e.results[0][0].transcript)
     }
     recog.onerror = () => { setIsListening(false); setStatusText('Talk to me') }
     recog.onend   = () => setIsListening(false)
@@ -227,31 +233,34 @@ export default function VoicePage() {
     window.speechSynthesis.speak(utterance)
   }, [])
 
-  // ── Chat API call ───────────────────────────────────────────────────────────
-  const handleTranscript = useCallback(async (transcript: string) => {
+  // ── Shared message handler — called by both voice and suggestion chips ──────
+  const handleUserMessage = useCallback(async (text: string) => {
     if (!patient) return
-    const triggered = isFutureQuestion(transcript)
+    const guidedFlow = isFutureQuestion(text)
+    setMessages(prev => [...prev, { role: 'user', text }])
     setIsProcessing(true)
     try {
       const res  = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: transcript, patientId: patient.id }),
+        body: JSON.stringify({ message: text, patientId: patient.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'API request failed')
-      if (triggered) setShowFuturePanel(true)
+      setMessages(prev => [...prev, { role: 'assistant', text: data.response, guidedFlow }])
       await speak(data.response)
     } catch (err) {
       console.error('Chat error:', err)
-      await speak("I'm sorry, I couldn't process that. Please try again.")
+      const errMsg = "I'm sorry, I couldn't process that. Please try again."
+      setMessages(prev => [...prev, { role: 'assistant', text: errMsg }])
+      await speak(errMsg)
     } finally {
       setIsProcessing(false)
     }
   }, [patient, speak])
 
-  // Keep ref in sync
-  handleTranscriptRef.current = handleTranscript
+  // Keep ref in sync so speech recognition always calls the latest version
+  handleUserMessageRef.current = handleUserMessage
 
   const toggleMic = () => {
     const r = recognitionRef.current
@@ -262,7 +271,7 @@ export default function VoicePage() {
 
   const handleSuggestion = (text: string) => {
     setStatusText(`"${text}"`)
-    handleTranscript(text)
+    handleUserMessage(text)
   }
 
   const isActive   = isListening || isProcessing || isSpeaking
@@ -557,19 +566,70 @@ export default function VoicePage() {
             ))}
           </div>
 
-          {/* Future risk panel — shown after a future-oriented question */}
-          {showFuturePanel && projection && (
-            <div style={{ marginTop: '2.5rem', width: '100%', maxWidth: 750 }}>
-              <GuidedFutureFlow
-                baselineRisk={projection.baselineRisk}
-                projectedRisk10y={projection.projectedRisk10y}
-                improvedRisk10y={projection.improvedRisk10y}
-                trajectory={projection.trajectory}
-                drivers={projection.drivers}
-                ldlCurrent={projection.ldlCurrent}
-                bpCurrent={projection.bpCurrent}
-                weightCurrent={projection.weightCurrent}
-              />
+          {/* Message history + guided flow panels */}
+          {messages.length > 0 && (
+            <div style={{ marginTop: '2.5rem', width: '100%', maxWidth: 750, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {messages.map((msg, i) => (
+                <div key={i}>
+                  {msg.role === 'user' ? (
+                    <div style={{
+                      alignSelf: 'flex-end',
+                      background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(6,182,212,0.08))',
+                      border: '1px solid rgba(139,92,246,0.2)',
+                      borderRadius: 16,
+                      padding: '0.75rem 1rem',
+                      fontSize: '0.875rem',
+                      color: '#334155',
+                      lineHeight: 1.6,
+                      textAlign: 'right',
+                    }}>
+                      {msg.text}
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{
+                        background: 'rgba(255,255,255,0.7)',
+                        backdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(14,165,233,0.15)',
+                        borderRadius: 16,
+                        padding: '0.75rem 1rem',
+                        fontSize: '0.875rem',
+                        color: '#334155',
+                        lineHeight: 1.6,
+                      }}>
+                        {msg.text}
+                      </div>
+                      {msg.guidedFlow && (() => {
+                        const p = projection ?? {
+                          baselineRisk: 18, projectedRisk10y: 34, improvedRisk10y: 14,
+                          trajectory: [
+                            { year: 'Today', current: 18, improved: 18 },
+                            { year: '2 yrs',  current: 22, improved: 17 },
+                            { year: '4 yrs',  current: 25, improved: 16 },
+                            { year: '6 yrs',  current: 28, improved: 15 },
+                            { year: '8 yrs',  current: 31, improved: 15 },
+                            { year: '10 yrs', current: 34, improved: 14 },
+                          ],
+                          drivers: ['LDL cholesterol', 'blood pressure', 'weight'],
+                          ldlCurrent: null, bpCurrent: null, weightCurrent: null,
+                        }
+                        return (
+                          <GuidedFutureFlow
+                            baselineRisk={p.baselineRisk}
+                            projectedRisk10y={p.projectedRisk10y}
+                            improvedRisk10y={p.improvedRisk10y}
+                            trajectory={p.trajectory}
+                            drivers={p.drivers}
+                            ldlCurrent={p.ldlCurrent}
+                            bpCurrent={p.bpCurrent}
+                            weightCurrent={p.weightCurrent}
+                          />
+                        )
+                      })()}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
