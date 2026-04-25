@@ -1,7 +1,7 @@
 'use client'
 
 import { Domain, PatientSnapshot } from './domainConfig'
-import { HealthDashboard } from './HealthDashboard'
+import { AdaptiveHealthBoard } from './AdaptiveHealthBoard'
 
 export interface AdaptiveInsightFlowProps {
   domain:               Domain
@@ -12,7 +12,7 @@ export interface AdaptiveInsightFlowProps {
 
 export function AdaptiveInsightFlow({ domain, snapshot, isActivelySpeaking = false, fullText = '' }: AdaptiveInsightFlowProps) {
   return (
-    <HealthDashboard
+    <AdaptiveHealthBoard
       domain={domain}
       snapshot={snapshot}
       isActivelySpeaking={isActivelySpeaking}
