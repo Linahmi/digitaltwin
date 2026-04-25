@@ -106,6 +106,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_allergies_patient   ON allergies(patient_id);
   CREATE INDEX IF NOT EXISTS idx_encounters_patient  ON encounters(patient_id);
   CREATE INDEX IF NOT EXISTS idx_patients_birth_date ON patients(birth_date);
+
+  CREATE TABLE IF NOT EXISTS pubmed_cache (
+    query TEXT PRIMARY KEY,
+    results_json TEXT,
+    created_at TEXT
+  );
 `)
 
 export default db
