@@ -3,12 +3,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { AlertCircle, UserCircle } from 'lucide-react'
 import Link from 'next/link'
-import { GuidedFutureFlow } from '@/components/voice/GuidedFutureFlow'
+import { AdaptiveInsightFlow } from '@/components/voice/AdaptiveInsightFlow'
+import {
+  getHealthDomain,
+  PatientSnapshot,
+  DEFAULT_SNAPSHOT,
+  Domain,
+} from '@/components/voice/domainConfig'
 
 interface Message {
   role: 'user' | 'assistant'
   text: string
-  guidedFlow?: boolean
+  domain?: Domain
+  showAdaptiveFlow?: boolean
 }
 
 interface PatientHeader {
@@ -144,6 +151,7 @@ export default function VoicePage() {
   const [isSpeaking, setIsSpeaking]   = useState(false)
   const [statusText, setStatusText]   = useState('Talk to me')
   const [projection, setProjection]   = useState<ProjectionState | null>(null)
+  const [snapshot, setSnapshot]       = useState<PatientSnapshot | null>(null)
   const [messages, setMessages]       = useState<Message[]>([])
   const recognitionRef = useRef<any>(null)
 
@@ -165,6 +173,13 @@ export default function VoicePage() {
         if (bioRes.ok) {
           const bm: PatientBiomarkersRaw = await bioRes.json()
           setProjection(buildProjection(bm))
+          setSnapshot({
+            age: bm.age, gender: bm.gender,
+            ldl: bm.ldl, hdl: bm.hdl,
+            systolicBP: bm.systolicBP, diastolicBP: bm.diastolicBP,
+            weight: bm.weight, bmi: bm.bmi,
+            glucose: bm.glucose, hba1c: bm.hba1c,
+          })
         }
       })
       .catch(() => setDbError('Could not reach the patient API. Is the server running?'))
@@ -236,7 +251,9 @@ export default function VoicePage() {
   // ── Shared message handler — called by both voice and suggestion chips ──────
   const handleUserMessage = useCallback(async (text: string) => {
     if (!patient) return
-    const guidedFlow = isFutureQuestion(text)
+    // Detect health domain; fall back to 'lifestyle' for generic future questions
+    const domain = getHealthDomain(text) ?? (isFutureQuestion(text) ? 'lifestyle' : null)
+    const showAdaptiveFlow = domain !== null
     setMessages(prev => [...prev, { role: 'user', text }])
     setIsProcessing(true)
     try {
@@ -247,7 +264,11 @@ export default function VoicePage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'API request failed')
-      setMessages(prev => [...prev, { role: 'assistant', text: data.response, guidedFlow }])
+      setMessages(prev => [...prev, {
+        role: 'assistant', text: data.response,
+        domain: domain ?? undefined,
+        showAdaptiveFlow,
+      }])
       await speak(data.response)
     } catch (err) {
       console.error('Chat error:', err)
@@ -566,7 +587,7 @@ export default function VoicePage() {
             ))}
           </div>
 
-          {/* Message history + guided flow panels */}
+          {/* Message history + adaptive insight panels */}
           {messages.length > 0 && (
             <div style={{ marginTop: '2.5rem', width: '100%', maxWidth: 750, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {messages.map((msg, i) => (
@@ -599,33 +620,12 @@ export default function VoicePage() {
                       }}>
                         {msg.text}
                       </div>
-                      {msg.guidedFlow && (() => {
-                        const p = projection ?? {
-                          baselineRisk: 18, projectedRisk10y: 34, improvedRisk10y: 14,
-                          trajectory: [
-                            { year: 'Today', current: 18, improved: 18 },
-                            { year: '2 yrs',  current: 22, improved: 17 },
-                            { year: '4 yrs',  current: 25, improved: 16 },
-                            { year: '6 yrs',  current: 28, improved: 15 },
-                            { year: '8 yrs',  current: 31, improved: 15 },
-                            { year: '10 yrs', current: 34, improved: 14 },
-                          ],
-                          drivers: ['LDL cholesterol', 'blood pressure', 'weight'],
-                          ldlCurrent: null, bpCurrent: null, weightCurrent: null,
-                        }
-                        return (
-                          <GuidedFutureFlow
-                            baselineRisk={p.baselineRisk}
-                            projectedRisk10y={p.projectedRisk10y}
-                            improvedRisk10y={p.improvedRisk10y}
-                            trajectory={p.trajectory}
-                            drivers={p.drivers}
-                            ldlCurrent={p.ldlCurrent}
-                            bpCurrent={p.bpCurrent}
-                            weightCurrent={p.weightCurrent}
-                          />
-                        )
-                      })()}
+                      {msg.showAdaptiveFlow && msg.domain && (
+                        <AdaptiveInsightFlow
+                          domain={msg.domain}
+                          snapshot={snapshot}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
