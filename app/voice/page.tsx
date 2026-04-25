@@ -544,23 +544,28 @@ export default function VoicePage() {
                     </div>
                   ) : (
                     <div>
-                      <div style={{
-                        background: 'rgba(255,255,255,0.7)',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(14,165,233,0.15)',
-                        borderRadius: 16,
-                        padding: '0.75rem 1rem',
-                        fontSize: '0.875rem',
-                        color: '#334155',
-                        lineHeight: 1.6,
-                      }}>
-                        {msg.text}
-                      </div>
-                      {msg.showAdaptiveFlow && msg.domain && (
+                      {msg.showAdaptiveFlow && msg.domain ? (
+                        // Guided response: no text bubble — narration strip is inside the dashboard
                         <AdaptiveInsightFlow
                           domain={msg.domain}
                           snapshot={snapshot}
+                          isActivelySpeaking={isSpeaking && i === messages.length - 1}
+                          fullText={msg.text}
                         />
+                      ) : (
+                        // Normal response: plain text bubble
+                        <div style={{
+                          background: 'rgba(255,255,255,0.7)',
+                          backdropFilter: 'blur(10px)',
+                          border: '1px solid rgba(14,165,233,0.15)',
+                          borderRadius: 16,
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem',
+                          color: '#334155',
+                          lineHeight: 1.6,
+                        }}>
+                          {msg.text}
+                        </div>
                       )}
                     </div>
                   )}

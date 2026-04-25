@@ -32,6 +32,7 @@ export interface CardDef {
   label:       string
   icon:        string
   accent:      string
+  caption:     string   // short one-line narration shown in the subtitle strip
   getValue(snap: PatientSnapshot): { display: string; status: CardStatus; statusLabel: string }
   getExplanation(snap: PatientSnapshot): string
   simulations: CardSimulation[]
@@ -171,6 +172,7 @@ function bmiDisplay(s: PatientSnapshot) {
 // cardiovascular cards
 const C_RISK: CardDef = {
   id: 'cvRisk', label: 'Cardiovascular Risk', icon: '❤️', accent: '#8b5cf6',
+  caption: 'Your cardiovascular risk is elevated based on current biomarkers.',
   getValue(s) {
     const v = cvBaseRisk(s)
     return { display: `${v}%`, status: v >= 20 ? 'elevated' : v >= 10 ? 'borderline' : 'good', statusLabel: v >= 20 ? 'Elevated' : v >= 10 ? 'Moderate' : 'Low' }
@@ -187,6 +189,7 @@ const C_RISK: CardDef = {
 }
 const C_LDL: CardDef = {
   id: 'ldl', label: 'LDL Cholesterol', icon: '🧬', accent: '#f59e0b',
+  caption: 'LDL cholesterol is the primary driver of your cardiovascular risk.',
   getValue(s) {
     if (s.ldl === null) return { display: '—', status: 'good', statusLabel: 'No data' }
     const v = Math.round(s.ldl)
@@ -205,6 +208,7 @@ const C_LDL: CardDef = {
 }
 const C_BP: CardDef = {
   id: 'bp', label: 'Blood Pressure', icon: '💉', accent: '#06b6d4',
+  caption: 'Blood pressure adds significant cardiovascular strain over time.',
   getValue(s) {
     if (s.systolicBP === null) return { display: '—', status: 'good', statusLabel: 'No data' }
     const sys = Math.round(s.systolicBP), dia = s.diastolicBP !== null ? Math.round(s.diastolicBP) : '?'
@@ -223,6 +227,7 @@ const C_BP: CardDef = {
 }
 const C_BMI: CardDef = {
   id: 'bmi', label: 'Weight / BMI', icon: '⚖️', accent: '#10b981',
+  caption: 'Weight is a key modifiable factor in your health risk.',
   getValue: bmiDisplay,
   getExplanation(s) {
     const b = s.bmi
@@ -239,6 +244,7 @@ const C_BMI: CardDef = {
 // metabolic cards
 const M_DRISK: CardDef = {
   id: 'diabetesRisk', label: 'Diabetes Risk', icon: '📊', accent: '#8b5cf6',
+  caption: 'Your metabolic profile shows elevated diabetes risk.',
   getValue(s) {
     const v = metBaseRisk(s)
     return { display: `${v}%`, status: v >= 30 ? 'elevated' : v >= 15 ? 'borderline' : 'good', statusLabel: v >= 30 ? 'High risk' : v >= 15 ? 'Moderate' : 'Low' }
@@ -255,6 +261,7 @@ const M_DRISK: CardDef = {
 }
 const M_GLUCOSE: CardDef = {
   id: 'glucose', label: 'Fasting Glucose', icon: '🍬', accent: '#f59e0b',
+  caption: 'Fasting glucose is trending toward prediabetes range.',
   getValue(s) {
     if (s.glucose === null) return { display: '—', status: 'good', statusLabel: 'No data' }
     const v = Math.round(s.glucose)
@@ -273,6 +280,7 @@ const M_GLUCOSE: CardDef = {
 }
 const M_HBA1C: CardDef = {
   id: 'hba1c', label: 'HbA1c', icon: '🔬', accent: '#ef4444',
+  caption: 'HbA1c reflects your 3-month average blood sugar.',
   getValue(s) {
     if (s.hba1c === null) return { display: '—', status: 'good', statusLabel: 'No data' }
     const v = s.hba1c.toFixed(1)
@@ -293,6 +301,7 @@ const M_HBA1C: CardDef = {
 // lifestyle cards
 const L_OVERALL: CardDef = {
   id: 'overallRisk', label: 'Overall Health Score', icon: '📈', accent: '#8b5cf6',
+  caption: 'Your blended health risk combines multiple lifestyle factors.',
   getValue(s) {
     const v = overallRisk(s)
     return { display: `${v}%`, status: v >= 25 ? 'elevated' : v >= 15 ? 'borderline' : 'good', statusLabel: v >= 25 ? 'Needs attention' : v >= 15 ? 'Moderate' : 'Good' }
@@ -309,6 +318,7 @@ const L_OVERALL: CardDef = {
 }
 const L_SLEEP: CardDef = {
   id: 'sleepStress', label: 'Sleep & Stress', icon: '😴', accent: '#6366f1',
+  caption: 'Sleep and stress are significantly affecting your health.',
   getValue(_s) {
     return { display: '62 / 100', status: 'borderline', statusLabel: 'Below optimal' }
   },
@@ -323,6 +333,7 @@ const L_SLEEP: CardDef = {
 }
 const L_ACTIVITY: CardDef = {
   id: 'activityDiet', label: 'Activity & Diet', icon: '🏃', accent: '#10b981',
+  caption: 'Activity and diet patterns shape your 10-year trajectory.',
   getValue(_s) {
     return { display: '55 / 100', status: 'elevated', statusLabel: 'Low activity' }
   },
@@ -339,6 +350,7 @@ const L_ACTIVITY: CardDef = {
 // medication cards
 const MED_ADH: CardDef = {
   id: 'adherence', label: 'Medication Adherence', icon: '💊', accent: '#0284c7',
+  caption: 'Medication adherence is critical to achieving full benefit.',
   getValue(_s) {
     return { display: '~75%', status: 'borderline', statusLabel: 'Suboptimal' }
   },
@@ -353,6 +365,7 @@ const MED_ADH: CardDef = {
 }
 const MED_BEN: CardDef = {
   id: 'benefit', label: 'Expected Benefit', icon: '📉', accent: '#10b981',
+  caption: 'Consistent therapy unlocks meaningful biomarker improvement.',
   getValue(s) {
     const ldl = s.ldl ?? 140
     const reduction = Math.round(ldl * 0.35)
@@ -370,6 +383,7 @@ const MED_BEN: CardDef = {
 }
 const MED_SIDE: CardDef = {
   id: 'monitoring', label: 'Monitoring Plan', icon: '🔍', accent: '#f59e0b',
+  caption: 'Regular monitoring optimizes your treatment and safety.',
   getValue(_s) {
     return { display: 'Routine', status: 'good', statusLabel: 'Low side-effect risk' }
   },
@@ -383,6 +397,7 @@ const MED_SIDE: CardDef = {
 }
 const MED_BIO: CardDef = {
   id: 'biomarkers', label: 'Related Biomarkers', icon: '📊', accent: '#8b5cf6',
+  caption: 'These biomarkers indicate how your treatment is performing.',
   getValue(s) {
     if (s.ldl === null) return { display: '—', status: 'good', statusLabel: 'No data' }
     const v = Math.round(s.ldl)
