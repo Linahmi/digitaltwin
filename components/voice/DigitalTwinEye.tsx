@@ -117,11 +117,11 @@ const VERTEX_SHADER = `
 
     // Color gradient: deep purple → purple → blue → cyan
     // Inner tones deliberately darker to avoid center blowout
-    vec3 innerColor = vec3(0.28, 0.15, 0.52);
-    vec3 midColor   = vec3(0.40, 0.24, 0.74);
-    vec3 outerColor = vec3(0.38, 0.65, 0.98);
-    vec3 edgeColor  = vec3(0.49, 0.83, 0.99);
-    vec3 fadeColor  = vec3(0.58, 0.87, 0.98);
+    vec3 innerColor = vec3(0.38, 0.24, 0.62);
+    vec3 midColor   = vec3(0.47, 0.31, 0.80);
+    vec3 outerColor = vec3(0.45, 0.69, 0.98);
+    vec3 edgeColor  = vec3(0.58, 0.86, 0.99);
+    vec3 fadeColor  = vec3(0.74, 0.92, 0.99);
 
     float rn = (radius + cn * 8.0) / 160.0;
 
@@ -304,7 +304,7 @@ export function DigitalTwinEye({ isListening, canInteract, onClick, size = 260 }
       // ── Soft pupil — larger radius to better contain the bright center ───────
       const pupilGeo = new THREE.CircleGeometry(28, 64)
       const pupilMat = new THREE.MeshBasicMaterial({
-        color: 0x040210, transparent: true, opacity: 0.92,
+        color: 0x1a1230, transparent: true, opacity: 0.68,
       })
       const pupil = new THREE.Mesh(pupilGeo, pupilMat)
       pupil.position.z = 6
@@ -314,8 +314,8 @@ export function DigitalTwinEye({ isListening, canInteract, onClick, size = 260 }
         transparent: true,
         side: THREE.DoubleSide,
         uniforms: {
-          innerColor: { value: new THREE.Color(0x050310) },
-          outerColor: { value: new THREE.Color(0x160830) },
+          innerColor: { value: new THREE.Color(0x22143d) },
+          outerColor: { value: new THREE.Color(0x4a2a78) },
         },
         vertexShader:   PUPIL_RING_VERT,
         fragmentShader: PUPIL_RING_FRAG,
@@ -415,6 +415,8 @@ export function DigitalTwinEye({ isListening, canInteract, onClick, size = 260 }
         boxShadow:    isListening
           ? '0 24px 70px rgba(139,92,246,0.28), 0 10px 30px rgba(6,182,212,0.18)'
           : '0 16px 50px rgba(139,92,246,0.15), 0 6px 18px rgba(0,0,0,0.07)',
+        background:   'radial-gradient(circle at center, rgba(255,255,255,0.42) 0%, rgba(244,114,182,0.12) 34%, rgba(6,182,212,0.08) 58%, rgba(255,255,255,0) 82%)',
+        backdropFilter: 'blur(2px)',
       }}
     />
   )

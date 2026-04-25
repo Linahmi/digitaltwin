@@ -1,17 +1,43 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { AlertCircle, UserCircle } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { AdaptiveInsightFlow } from '@/components/voice/AdaptiveInsightFlow'
-import { DigitalTwinEye } from '@/components/voice/DigitalTwinEye'
-import { Citation } from '@/types/patient'
+import type { Citation } from '@/types/patient'
 import {
   getHealthDomain,
-  PatientSnapshot,
-  DEFAULT_SNAPSHOT,
-  Domain,
 } from '@/components/voice/domainConfig'
+import type { PatientSnapshot, Domain } from '@/components/voice/domainConfig'
+
+const AdaptiveInsightFlow = dynamic(
+  () => import('@/components/voice/AdaptiveInsightFlow').then(mod => mod.AdaptiveInsightFlow),
+  { ssr: false },
+)
+
+const DigitalTwinEye = dynamic(
+  () => import('@/components/voice/DigitalTwinEye').then(mod => mod.DigitalTwinEye),
+  { ssr: false },
+)
+
+function AlertIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="mx-auto mb-6 h-12 w-12 text-amber-400">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 7.5v5" strokeLinecap="round" />
+      <circle cx="12" cy="16.5" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function ProfileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="h-4 w-4">
+      <circle cx="12" cy="8" r="3.25" />
+      <path d="M5.5 19a6.5 6.5 0 0 1 13 0" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="9.25" opacity="0.35" />
+    </svg>
+  )
+}
 
 interface Message {
   role: 'user' | 'assistant'
@@ -154,15 +180,15 @@ const SUGGESTIONS = [
 ]
 
 export default function VoicePage() {
-  const [patient, setPatient]         = useState<PatientHeader | null>(null)
-  const [dbError, setDbError]         = useState<string | null>(null)
+  const [patient, setPatient] = useState<PatientHeader | null>(null)
+  const [dbError, setDbError] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [isSpeaking, setIsSpeaking]   = useState(false)
-  const [statusText, setStatusText]   = useState('Talk to me')
-  const [projection, setProjection]   = useState<ProjectionState | null>(null)
-  const [snapshot, setSnapshot]       = useState<PatientSnapshot | null>(null)
-  const [messages, setMessages]       = useState<Message[]>([])
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [statusText, setStatusText] = useState('Talk to me')
+  const [projection, setProjection] = useState<ProjectionState | null>(null)
+  const [snapshot, setSnapshot] = useState<PatientSnapshot | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
   const recognitionRef = useRef<any>(null)
 
   // Stable ref so speech recognition always calls the latest handleUserMessage
@@ -201,23 +227,23 @@ export default function VoicePage() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SR) return
     const recog = new SR()
-    recog.continuous     = false
+    recog.continuous = false
     recog.interimResults = false
-    recog.lang           = 'en-US'
+    recog.lang = 'en-US'
     recog.onresult = (e: any) => {
       setIsListening(false)
       handleUserMessageRef.current(e.results[0][0].transcript)
     }
     recog.onerror = () => { setIsListening(false); setStatusText('Talk to me') }
-    recog.onend   = () => setIsListening(false)
+    recog.onend = () => setIsListening(false)
     recognitionRef.current = recog
   }, [])
 
   // ── Status text driven by state ─────────────────────────────────────────────
   useEffect(() => {
-    if (isListening)  { setStatusText("I'm here"); return }
+    if (isListening) { setStatusText("I'm here"); return }
     if (isProcessing) { setStatusText('Thinking together...'); return }
-    if (isSpeaking)   { setStatusText('Sharing with you...'); return }
+    if (isSpeaking) { setStatusText('Sharing with you...'); return }
     setStatusText('Talk to me')
   }, [isListening, isProcessing, isSpeaking])
 
@@ -240,11 +266,11 @@ export default function VoicePage() {
       window.speechSynthesis.onvoiceschanged = () => resolve()
       setTimeout(resolve, 2000)
     })
-    const utterance       = new SpeechSynthesisUtterance(text)
-    utterance.lang        = 'en-US'
-    utterance.rate        = 1.0
-    utterance.pitch       = 1.0
-    utterance.volume      = 1.0
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'en-US'
+    utterance.rate = 1.0
+    utterance.pitch = 1.0
+    utterance.volume = 1.0
     const voice = getBestVoice()
     if (voice) utterance.voice = voice
     utterance.onstart = () => setIsSpeaking(true)
@@ -253,7 +279,7 @@ export default function VoicePage() {
       window.speechSynthesis.pause()
       window.speechSynthesis.resume()
     }, 10_000)
-    utterance.onend  = () => { clearInterval(keepAlive); setIsSpeaking(false) }
+    utterance.onend = () => { clearInterval(keepAlive); setIsSpeaking(false) }
     utterance.onerror = () => { clearInterval(keepAlive); setIsSpeaking(false) }
     window.speechSynthesis.speak(utterance)
   }, [])
@@ -267,7 +293,7 @@ export default function VoicePage() {
     setMessages(prev => [...prev, { role: 'user', text }])
     setIsProcessing(true)
     try {
-      const res  = await fetch('/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, patientId: patient.id }),
@@ -299,7 +325,7 @@ export default function VoicePage() {
     const r = recognitionRef.current
     if (!r) { alert('Speech recognition not supported. Try Chrome.'); return }
     if (isListening) { r.stop(); setIsListening(false) }
-    else             { r.start(); setIsListening(true)  }
+    else { r.start(); setIsListening(true) }
   }
 
   const handleSuggestion = (text: string) => {
@@ -307,7 +333,7 @@ export default function VoicePage() {
     handleUserMessage(text)
   }
 
-  const isActive   = isListening || isProcessing || isSpeaking
+  const isActive = isListening || isProcessing || isSpeaking
   const canInteract = !isProcessing && !isSpeaking
 
   // ── Error state ─────────────────────────────────────────────────────────────
@@ -315,7 +341,7 @@ export default function VoicePage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6">
         <div className="max-w-lg text-center">
-          <AlertCircle className="mx-auto mb-6 h-12 w-12 text-amber-400" />
+          <AlertIcon />
           <h1 className="mb-3 text-xl font-semibold text-white">Database Setup Required</h1>
           <p className="mb-6 text-slate-400">{dbError}</p>
           <div className="rounded-lg border border-slate-700 bg-slate-900 p-4 text-left text-sm font-mono text-slate-300">
@@ -389,26 +415,6 @@ export default function VoicePage() {
             animation: 'auraPulse 4s ease-in-out infinite',
           }}
         />
-        {/* Wireframe face image (breathing) */}
-        <div
-          style={{
-            position: 'absolute',
-            width: 700, height: 700,
-            opacity: 0.12,
-            animation: 'faceBreathe 6s ease-in-out infinite',
-          }}
-        >
-          <img
-            src="/wireframe-face-bg.png"
-            alt=""
-            style={{
-              width: '100%', height: '100%',
-              objectFit: 'contain',
-              filter: 'brightness(1.4) contrast(0.8) hue-rotate(10deg)',
-              mixBlendMode: 'multiply',
-            }}
-          />
-        </div>
       </div>
 
       {/* ── Content layer ────────────────────────────────────────────────────── */}
@@ -440,7 +446,7 @@ export default function VoicePage() {
           className="absolute top-12 right-6 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all hover:bg-sky-50"
           style={{ color: '#0284c7', border: '1px solid rgba(14,165,233,0.2)' }}
         >
-          <UserCircle className="h-4 w-4" />
+          <ProfileIcon />
           View Profile
         </Link>
 
@@ -555,18 +561,29 @@ export default function VoicePage() {
                     </div>
                   ) : (
                     <div>
-                      <div style={{
-                        background: 'rgba(255,255,255,0.7)',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(14,165,233,0.15)',
-                        borderRadius: 16,
-                        padding: '0.75rem 1rem',
-                        fontSize: '0.875rem',
-                        color: '#334155',
-                        lineHeight: 1.6,
-                      }}>
-                        {msg.text}
-                      </div>
+                      {msg.showAdaptiveFlow && msg.domain ? (
+                        // Guided response: no text bubble; narration strip is inside the dashboard
+                        <AdaptiveInsightFlow
+                          domain={msg.domain}
+                          snapshot={snapshot}
+                          isActivelySpeaking={isSpeaking && i === messages.length - 1}
+                          fullText={msg.text}
+                        />
+                      ) : (
+                        // Normal response: plain text bubble
+                        <div style={{
+                          background: 'rgba(255,255,255,0.7)',
+                          backdropFilter: 'blur(10px)',
+                          border: '1px solid rgba(14,165,233,0.15)',
+                          borderRadius: 16,
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.875rem',
+                          color: '#334155',
+                          lineHeight: 1.6,
+                        }}>
+                          {msg.text}
+                        </div>
+                      )}
                       {(msg.evidence || (msg.citations && msg.citations.length > 0)) && (
                         <div style={{
                           marginTop: '0.75rem',
@@ -618,12 +635,6 @@ export default function VoicePage() {
                           )}
                         </div>
                       )}
-                      {msg.showAdaptiveFlow && msg.domain && (
-                        <AdaptiveInsightFlow
-                          domain={msg.domain}
-                          snapshot={snapshot}
-                        />
-                      )}
                     </div>
                   )}
                 </div>
@@ -657,10 +668,6 @@ export default function VoicePage() {
         @keyframes gentleGradient {
           0%, 100% { background: linear-gradient(135deg, #fefefe 0%, #f0f9ff 40%, #e0f2fe 100%); }
           50%       { background: linear-gradient(135deg, #fefefe 0%, #fdf4ff 40%, #f3e8ff 100%); }
-        }
-        @keyframes faceBreathe {
-          0%, 100% { transform: scale(1);    opacity: 0.12; }
-          50%       { transform: scale(1.02); opacity: 0.15; }
         }
         @keyframes humanPulse {
           0%, 100% { opacity: 0.4; transform: scale(1);    }
