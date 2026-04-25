@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Mic, MicOff, Volume2 } from 'lucide-react'
 
 interface VoiceInterfaceProps {
@@ -9,60 +9,96 @@ interface VoiceInterfaceProps {
   responseText?: string
 }
 
+// ── Waveform bars (used in Listening + Speaking states) ──────────────────────
+function Waveform({ active }: { active: boolean }) {
+  const bars = 7
+  return (
+    <div className="flex items-center justify-center gap-[3px] h-8">
+      {Array.from({ length: bars }).map((_, i) => (
+        <span
+          key={i}
+          className="block w-[3px] rounded-full"
+          style={{
+            background: '#00e5ff',
+            height: active ? undefined : '6px',
+            opacity: active ? 1 : 0.25,
+            animation: active
+              ? `waveBar 0.9s ease-in-out ${i * 0.1}s infinite alternate`
+              : 'none',
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes waveBar {
+          from { height: 4px; }
+          to   { height: 28px; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// ── Thinking dots ─────────────────────────────────────────────────────────────
+function ThinkingDots() {
+  return (
+    <div className="flex items-center gap-1.5">
+      {[0, 1, 2].map(i => (
+        <span
+          key={i}
+          className="block h-1.5 w-1.5 rounded-full bg-cyan-400"
+          style={{ animation: `dotPulse 1.2s ease-in-out ${i * 0.2}s infinite` }}
+        />
+      ))}
+      <style>{`
+        @keyframes dotPulse {
+          0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+          40%            { opacity: 1;   transform: scale(1); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 export function VoiceInterface({ onTranscript, isProcessing, responseText }: VoiceInterfaceProps) {
-  const [isListening, setIsListening] = useState(false)
-  const [isSpeaking, setIsSpeaking] = useState(false)
-  const [recognition, setRecognition] = useState<any>(null)
+  const [isListening, setIsListening]   = useState(false)
+  const [isSpeaking,  setIsSpeaking]    = useState(false)
+  const recognitionRef                  = useRef<any>(null)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (SpeechRecognition) {
-        const recog = new SpeechRecognition()
-        recog.continuous = false
-        recog.interimResults = false
-        recog.lang = 'en-US'
-
-        recog.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript
-          onTranscript(transcript)
-          setIsListening(false)
-        }
-
-        recog.onerror = () => {
-          setIsListening(false)
-        }
-
-        recog.onend = () => {
-          setIsListening(false)
-        }
-
-        setRecognition(recog)
-      }
-    }
+    if (typeof window === 'undefined') return
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SR) return
+    const recog = new SR()
+    recog.continuous     = false
+    recog.interimResults = false
+    recog.lang           = 'en-US'
+    recog.onresult = (e: any) => { onTranscript(e.results[0][0].transcript); setIsListening(false) }
+    recog.onerror  = () => setIsListening(false)
+    recog.onend    = () => setIsListening(false)
+    recognitionRef.current = recog
   }, [onTranscript])
 
   useEffect(() => {
     if (responseText && !isProcessing) {
-      speak(responseText)
+      if (!('speechSynthesis' in window)) return
+      window.speechSynthesis.cancel()
+      const utt   = new SpeechSynthesisUtterance(responseText)
+      utt.rate    = 0.95
+      utt.pitch   = 1.0
+      utt.onstart = () => setIsSpeaking(true)
+      utt.onend   = () => setIsSpeaking(false)
+      window.speechSynthesis.speak(utt)
     }
   }, [responseText, isProcessing])
 
-  const toggleListening = () => {
-    if (!recognition) {
-      alert('Speech recognition not supported in this browser. Try Chrome.')
-      return
-    }
-
-    if (isListening) {
-      recognition.stop()
-      setIsListening(false)
-    } else {
-      recognition.start()
-      setIsListening(true)
-    }
+  const toggle = () => {
+    const r = recognitionRef.current
+    if (!r) { alert('Speech recognition not supported. Try Chrome.'); return }
+    if (isListening) { r.stop(); setIsListening(false) }
+    else             { r.start(); setIsListening(true) }
   }
 
+<<<<<<< HEAD
   const getBestVoice = (): SpeechSynthesisVoice | null => {
     const voices = window.speechSynthesis.getVoices()
     if (!voices.length) return null
@@ -144,49 +180,87 @@ export function VoiceInterface({ onTranscript, isProcessing, responseText }: Voi
       setIsSpeaking(false)
     }
   }
+=======
+  const disabled    = isProcessing || isSpeaking
+  const micActive   = isListening
+  const glowColor   = micActive ? 'rgba(0,229,255,0.55)' : 'rgba(0,229,255,0.25)'
+  const ringColor   = micActive ? 'rgba(0,229,255,0.35)' : 'rgba(0,229,255,0.15)'
+
+  // Derive state label
+  const stateLabel = isListening  ? 'Listening…'
+    : isProcessing                ? 'Thinking…'
+    : isSpeaking                  ? 'Speaking…'
+    : 'Tap to speak with your twin'
+>>>>>>> 525ed9c (feat: add landing page animations, voice interface enhancements, and synthetic FHIR patient data generation.)
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-5">
+
+      {/* State indicator */}
+      <div className="flex h-8 items-center justify-center gap-3">
+        {isListening  && <Waveform active />}
+        {isProcessing && <ThinkingDots />}
+        {isSpeaking   && <Waveform active />}
+        <span
+          className="text-sm font-medium tracking-wide"
+          style={{
+            color: (isListening || isSpeaking) ? '#00e5ff'
+              : isProcessing ? 'rgba(0,229,255,0.6)'
+              : 'rgba(255,255,255,0.35)',
+          }}
+        >
+          {stateLabel}
+        </span>
+      </div>
+
+      {/* Mic button */}
       <button
-        onClick={toggleListening}
-        disabled={isProcessing || isSpeaking}
-        className={`
-          relative flex h-24 w-24 items-center justify-center rounded-full
-          transition-all duration-300
-          ${isListening 
-            ? 'bg-red-500 shadow-lg shadow-red-500/50 scale-110' 
-            : 'bg-blue-600 hover:bg-blue-500 hover:scale-105'
-          }
-          ${(isProcessing || isSpeaking) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-        `}
+        onClick={toggle}
+        disabled={disabled}
+        aria-label={isListening ? 'Stop listening' : 'Start listening'}
+        className="relative flex items-center justify-center rounded-full transition-all duration-300 focus:outline-none"
+        style={{
+          width: 88, height: 88,
+          background: micActive
+            ? 'radial-gradient(circle, rgba(0,229,255,0.25) 0%, rgba(0,229,255,0.08) 70%)'
+            : 'radial-gradient(circle, rgba(0,229,255,0.12) 0%, rgba(0,229,255,0.04) 70%)',
+          boxShadow: `0 0 0 1.5px rgba(0,229,255,${micActive ? 0.6 : 0.3}), 0 0 32px ${glowColor}, 0 0 64px ${glowColor}`,
+          transform: micActive ? 'scale(1.08)' : 'scale(1)',
+          opacity: disabled ? 0.45 : 1,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+        }}
       >
-        {isListening ? (
+        {/* Idle pulse ring */}
+        {!micActive && !disabled && (
           <>
-            <Mic className="h-10 w-10 text-white" />
-            <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-75" />
+            <span className="absolute inset-0 rounded-full"
+              style={{ border: `1px solid ${ringColor}`, animation: 'outerPing 2.5s ease-out infinite' }} />
+            <span className="absolute inset-[-12px] rounded-full"
+              style={{ border: `1px solid rgba(0,229,255,0.08)`, animation: 'outerPing 2.5s ease-out 0.8s infinite' }} />
           </>
-        ) : (
-          <MicOff className="h-10 w-10 text-white" />
         )}
+        {/* Active ripple */}
+        {micActive && (
+          <span className="absolute inset-0 rounded-full"
+            style={{ background: 'rgba(0,229,255,0.15)', animation: 'ripple 1s ease-out infinite' }} />
+        )}
+
+        {isListening
+          ? <Mic    className="relative z-10 h-9 w-9" style={{ color: '#00e5ff' }} />
+          : <MicOff className="relative z-10 h-9 w-9" style={{ color: disabled ? '#475569' : 'rgba(0,229,255,0.7)' }} />
+        }
       </button>
 
-      <div className="text-center">
-        {isListening && (
-          <p className="text-sm text-blue-400 animate-pulse">Listening...</p>
-        )}
-        {isProcessing && (
-          <p className="text-sm text-yellow-400 animate-pulse">Processing...</p>
-        )}
-        {isSpeaking && (
-          <div className="flex items-center gap-2 text-sm text-green-400">
-            <Volume2 className="h-4 w-4 animate-pulse" />
-            <span>Speaking...</span>
-          </div>
-        )}
-        {!isListening && !isProcessing && !isSpeaking && (
-          <p className="text-sm text-slate-400">Tap to speak with your twin</p>
-        )}
-      </div>
+      <style>{`
+        @keyframes outerPing {
+          0%   { transform: scale(1);   opacity: 0.6; }
+          100% { transform: scale(1.7); opacity: 0; }
+        }
+        @keyframes ripple {
+          0%   { transform: scale(1);   opacity: 0.5; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+      `}</style>
     </div>
   )
 }
