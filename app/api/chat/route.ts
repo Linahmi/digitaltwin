@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { buildSyntheaContext, getPatientSummary } from '@/lib/db/patientContext'
 import { getTopEvidence } from '@/lib/evidence/evidenceSelector'
+import { buildPatientDisplayName } from '@/lib/report/patientDisplayName'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         )
       }
-      patientName = `${summary.firstName} ${summary.lastName}`
+      patientName = buildPatientDisplayName(summary.firstName, summary.lastName).displayName
 
       const ctx = buildSyntheaContext(patientId)
       if (!ctx) {

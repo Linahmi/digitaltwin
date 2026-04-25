@@ -81,6 +81,7 @@ interface PatientHeader {
   id: string
   firstName: string
   lastName: string
+  displayName?: string
   age: number | null
   gender: string | null
 }
@@ -121,6 +122,8 @@ const SUGGESTIONS = [
   "How's my blood pressure?",
 ]
 
+const VOICE_PATIENT_PRESET = 'chadwick'
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function VoicePage() {
@@ -149,14 +152,13 @@ export default function VoicePage() {
 
   // Patient + biomarkers
   useEffect(() => {
-    const patientId = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_ID ?? ''
-    const url = patientId ? `/api/patient?id=${patientId}` : '/api/patient'
-    fetch(url)
+    const patientUrl = `/api/patient?preset=${VOICE_PATIENT_PRESET}`
+    fetch(patientUrl)
       .then(async res => {
         const data = await res.json()
         if (!res.ok) { setDbError(data.error ?? 'Failed to load patient'); return }
         setPatient(data)
-        const bioUrl = patientId ? `/api/biomarkers?id=${patientId}` : '/api/biomarkers'
+        const bioUrl = `/api/biomarkers?id=${data.id}&preset=${VOICE_PATIENT_PRESET}`
         const bioRes = await fetch(bioUrl)
         if (bioRes.ok) {
           const bm: PatientBiomarkersRaw = await bioRes.json()
@@ -353,6 +355,34 @@ export default function VoicePage() {
     >
       {/* ── Ambient background ─────────────────────────────────────────────── */}
       <div className="pointer-events-none" style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
+        {/* Breathing Anatomic Face */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: 0.15,
+          filter: 'contrast(1.1) brightness(1.1)',
+        }}>
+          <motion.img
+            src="/digital-face.png"
+            alt=""
+            animate={{
+              scale: [1, 1.02, 1],
+              opacity: [0.12, 0.18, 0.12],
+            }}
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            style={{
+              maxHeight: '85vh',
+              width: 'auto',
+              objectFit: 'contain',
+            }}
+          />
+        </div>
+
+        {/* Global Glow */}
         <div style={{
           position: 'absolute', width: 700, height: 700,
           top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
@@ -376,8 +406,8 @@ export default function VoicePage() {
             Your Health Twin
           </div>
           <div style={{ fontSize: 13, color: '#64748b', fontWeight: 400 }}>
-            {patient.firstName} {patient.lastName}{patient.age !== null ? ` · ${patient.age} yrs` : ''}
-          </div>
+            {patient.displayName ?? `${patient.firstName} ${patient.lastName}`}{patient.age !== null ? ` · ${patient.age} yrs` : ''}
+            </div>
         </div>
       </div>
 

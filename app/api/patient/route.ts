@@ -12,22 +12,35 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getPatientSummary, getFirstPatient } from '@/lib/db/patientContext'
+import { findChadwickPatientSummary } from '@/lib/report/getChadwickPatient'
+import { buildPatientDisplayName } from '@/lib/report/patientDisplayName'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id') ?? undefined
+  const preset = searchParams.get('preset')
 
   try {
-    const patient = id ? getPatientSummary(id) : getFirstPatient()
+    const patient =
+      id
+        ? getPatientSummary(id)
+        : preset === 'chadwick'
+          ? findChadwickPatientSummary()
+          : getFirstPatient()
 
     if (!patient) {
       return NextResponse.json(
-        { error: `Patient not found: ${id}` },
+        { error: `Patient not found: ${id ?? preset ?? 'default'}` },
         { status: 404 }
       )
     }
 
-    return NextResponse.json(patient)
+    const display = buildPatientDisplayName(patient.firstName, patient.lastName)
+
+    return NextResponse.json({
+      ...patient,
+      ...display,
+    })
   } catch (error: any) {
     const isEmptyDB = error.message?.includes('No Synthea patients found')
     return NextResponse.json(

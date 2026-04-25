@@ -8,27 +8,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getClinicalSummary } from '@/lib/db/clinicalSummary'
 import { getFirstPatient } from '@/lib/db/patientContext'
+import { findChadwickPatientSummary } from '@/lib/report/getChadwickPatient'
+import { buildPatientDisplayName } from '@/lib/report/patientDisplayName'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   let patientId = searchParams.get('id') ?? null
+  const preset = searchParams.get('preset')
 
   try {
-    // If no id given, fall back to first patient
+    // If no id given, prefer an explicit preset before falling back to the first patient.
     if (!patientId) {
-      const first = getFirstPatient()
-      if (!first) {
+      const selectedPatient =
+        preset === 'chadwick'
+          ? findChadwickPatientSummary()
+          : getFirstPatient()
+
+      if (!selectedPatient) {
         return NextResponse.json({ error: 'No patients found' }, { status: 503 })
       }
-      patientId = first.id
+      patientId = selectedPatient.id
     }
 
     const summary = getClinicalSummary(patientId)
+    const display = buildPatientDisplayName(summary.demographics.firstName, summary.demographics.lastName)
 
     const biomarkers = {
       patientId,
-      firstName: summary.demographics.firstName,
-      lastName: summary.demographics.lastName,
+      firstName: display.firstName,
+      lastName: display.lastName,
+      displayName: display.displayName,
       age: summary.demographics.age,
       gender: summary.demographics.gender,
       ldl: summary.latestLabs.ldl?.value ?? null,
