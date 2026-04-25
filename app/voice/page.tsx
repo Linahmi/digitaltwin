@@ -23,9 +23,9 @@ function AmbientPresence({ active }: { active: boolean }) {
         className="absolute rounded-full"
         style={{
           width: 480, height: 480,
-          background: 'radial-gradient(circle, rgba(0,229,255,0.055) 0%, rgba(0,229,255,0.015) 50%, transparent 75%)',
+          background: 'radial-gradient(circle, rgba(14,165,233,0.08) 0%, rgba(14,165,233,0.02) 50%, transparent 75%)',
           animation: 'breathe 6s ease-in-out infinite',
-          filter: 'blur(2px)',
+          filter: 'blur(10px)',
         }}
       />
       {/* Middle ring */}
@@ -33,7 +33,7 @@ function AmbientPresence({ active }: { active: boolean }) {
         className="absolute rounded-full"
         style={{
           width: 220, height: 220,
-          border: `1px solid rgba(0,229,255,${active ? 0.22 : 0.10})`,
+          border: `1px solid rgba(14,165,233,${active ? 0.22 : 0.08})`,
           animation: 'breathe 4.5s ease-in-out 0.5s infinite',
           transition: 'border-color 0.8s ease',
         }}
@@ -43,8 +43,8 @@ function AmbientPresence({ active }: { active: boolean }) {
         className="absolute rounded-full"
         style={{
           width: 120, height: 120,
-          border: `1px solid rgba(0,229,255,${active ? 0.40 : 0.18})`,
-          boxShadow: active ? '0 0 30px rgba(0,229,255,0.15)' : 'none',
+          border: `1px solid rgba(14,165,233,${active ? 0.40 : 0.15})`,
+          boxShadow: active ? '0 0 30px rgba(14,165,233,0.1)' : 'none',
           animation: 'breathe 4s ease-in-out 1s infinite',
           transition: 'border-color 0.8s, box-shadow 0.8s',
         }}
@@ -53,16 +53,16 @@ function AmbientPresence({ active }: { active: boolean }) {
       <div
         className="absolute rounded-full"
         style={{
-          width: 6, height: 6,
-          background: `rgba(0,229,255, ${active ? 0.9 : 0.4})`,
-          boxShadow: `0 0 12px 4px rgba(0,229,255, ${active ? 0.4 : 0.12})`,
+          width: 8, height: 8,
+          background: `rgba(14,165,233, ${active ? 0.8 : 0.3})`,
+          boxShadow: `0 0 12px 4px rgba(14,165,233, ${active ? 0.3 : 0.08})`,
           transition: 'all 0.8s',
         }}
       />
       <style>{`
         @keyframes breathe {
           0%,100% { transform: scale(1);    opacity: 0.7; }
-          50%      { transform: scale(1.06); opacity: 1; }
+          50%      { transform: scale(1.04); opacity: 1; }
         }
       `}</style>
     </div>
@@ -71,18 +71,18 @@ function AmbientPresence({ active }: { active: boolean }) {
 
 // ── Subtle floating particles (pure CSS, no canvas) ───────────────────────────
 function FloatingParticles() {
-  const dots = Array.from({ length: 18 }, (_, i) => ({
+  const dots = Array.from({ length: 25 }, (_, i) => ({
     id: i,
-    size: 1.5 + Math.random() * 2,
+    size: 2 + Math.random() * 4,
     x: Math.random() * 100,
     y: Math.random() * 100,
-    dur: 8 + Math.random() * 12,
-    delay: Math.random() * 8,
-    amp: 10 + Math.random() * 20,
+    dur: 15 + Math.random() * 20,
+    delay: Math.random() * 10,
+    warm: Math.random() > 0.85,
   }))
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ filter: 'blur(1.5px)' }}>
       {dots.map(d => (
         <span
           key={d.id}
@@ -90,16 +90,15 @@ function FloatingParticles() {
           style={{
             width: d.size, height: d.size,
             left: `${d.x}%`, top: `${d.y}%`,
-            background: 'rgba(0,229,255,0.45)',
-            boxShadow: '0 0 4px 2px rgba(0,229,255,0.15)',
+            background: d.warm ? 'rgba(236,72,153,0.3)' : 'rgba(14,165,233,0.4)',
             animation: `floatDot ${d.dur}s ease-in-out ${d.delay}s infinite alternate`,
           }}
         />
       ))}
       <style>{`
         @keyframes floatDot {
-          from { transform: translateY(0px) translateX(0px); opacity: 0.2; }
-          to   { transform: translateY(-20px) translateX(8px); opacity: 0.6; }
+          from { transform: translateY(0px) translateX(0px); opacity: 0.3; }
+          to   { transform: translateY(-30px) translateX(15px); opacity: 0.7; }
         }
       `}</style>
     </div>
@@ -112,11 +111,11 @@ function EmptyState() {
     <div className="flex flex-col items-center justify-center text-center py-16 select-none">
       <p
         className="text-base font-medium mb-2"
-        style={{ color: 'rgba(255,255,255,0.45)' }}
+        style={{ color: '#475569' }}
       >
         Ask your digital twin about your health
       </p>
-      <p className="text-sm" style={{ color: 'rgba(0,229,255,0.45)' }}>
+      <p className="text-sm" style={{ color: '#0284c7' }}>
         "What's my risk of heart disease?"
       </p>
     </div>
@@ -258,7 +257,7 @@ export default function VoicePage() {
   return (
     <div
       className="flex min-h-screen flex-col relative"
-      style={{ background: '#020617', color: '#f1f5f9' }}
+      style={{ background: 'linear-gradient(135deg, #ffffff 0%, #eaf6ff 50%, #f0fbff 100%)', color: '#0f172a' }}
     >
       {/* Subtle background particles */}
       <FloatingParticles />
@@ -266,15 +265,15 @@ export default function VoicePage() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header
         className="relative z-10 flex flex-col items-center py-6 px-6"
-        style={{ borderBottom: '1px solid rgba(0,229,255,0.08)' }}
+        style={{ borderBottom: '1px solid rgba(14,165,233,0.15)' }}
       >
         <p
           className="text-[10px] font-semibold uppercase tracking-[0.35em] mb-1"
-          style={{ color: '#00e5ff' }}
+          style={{ color: '#0284c7' }}
         >
           Digital Health Twin
         </p>
-        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>
+        <p className="text-sm" style={{ color: '#64748b' }}>
           {patient.firstName} {patient.lastName} {patient.age !== null ? `· ${patient.age} yrs` : ''}
         </p>
       </header>
@@ -305,16 +304,16 @@ export default function VoicePage() {
                 <div className="flex gap-3">
                   <div
                     className="h-7 w-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold mt-1"
-                    style={{ background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.2)', color: 'rgba(0,229,255,0.7)' }}
+                    style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.25)', color: '#0284c7' }}
                   >
                     AI
                   </div>
                   <div
                     className="rounded-2xl px-5 py-4 flex items-center gap-1.5"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(14,165,233,0.15)', boxShadow: '0 4px 12px rgba(14,165,233,0.05)' }}
                   >
                     {[0,1,2].map(i => (
-                      <span key={i} className="block h-1.5 w-1.5 rounded-full bg-cyan-400"
+                      <span key={i} className="block h-1.5 w-1.5 rounded-full bg-sky-500"
                         style={{ animation: `dotPulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
                     ))}
                   </div>
@@ -334,7 +333,7 @@ export default function VoicePage() {
       {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
       <div
         className="relative z-10 flex justify-center px-6 py-8"
-        style={{ borderTop: '1px solid rgba(0,229,255,0.08)' }}
+        style={{ borderTop: '1px solid rgba(14,165,233,0.15)' }}
       >
         <VoiceInterface
           onTranscript={handleTranscript}

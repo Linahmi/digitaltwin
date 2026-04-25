@@ -6,38 +6,39 @@
 <title>Digital Health Twin</title>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;overflow:hidden;background:#020617;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-#cv{position:fixed;inset:0;z-index:0}
+html,body{width:100%;height:100%;overflow:hidden;background:linear-gradient(135deg, #ffffff 0%, #eaf6ff 50%, #f0fbff 100%);font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+#cv{position:fixed;inset:0;z-index:0;filter:blur(1px)}
 #cv canvas{display:block;width:100%!important;height:100%!important}
 
 /* Eyes */
-#eyes{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity 2s ease}
+#eyes{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity 3s ease}
 #eyes.on{opacity:1}
 #eyes-inner{display:flex;align-items:center;gap:110px;transition:transform .12s ease-out}
-.eye{width:38px;height:38px;border-radius:50%;background:radial-gradient(circle,rgba(0,229,255,1) 0%,rgba(0,229,255,.65) 28%,rgba(0,229,255,.2) 60%,rgba(0,229,255,0) 80%);box-shadow:0 0 12px 4px rgba(0,229,255,.5),0 0 32px 12px rgba(0,229,255,.2),0 0 70px 24px rgba(0,229,255,.07);animation:ebreathe 3s ease-in-out infinite}
-.eye:nth-child(2){animation-delay:.18s}
-@keyframes ebreathe{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.07)}}
+.eye{width:38px;height:38px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,0.8) 0%,rgba(14,165,233,.4) 30%,rgba(14,165,233,0) 80%);box-shadow:0 0 20px 6px rgba(14,165,233,.2);animation:ebreathe 4s ease-in-out infinite}
+.eye:nth-child(2){animation-delay:.2s}
+@keyframes ebreathe{0%,100%{opacity:.6;transform:scale(0.95)}50%{opacity:1;transform:scale(1.05)}}
 
 /* UI */
 #ui{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;padding-top:160px;pointer-events:none}
+#ui::before{content:'';position:absolute;width:600px;height:400px;background:radial-gradient(circle, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.4) 40%, transparent 70%);filter:blur(30px);z-index:-1;border-radius:50%}
 #ui.on{pointer-events:auto}
 .u{opacity:0;transform:translateY(16px)}
 #ui.on .u{opacity:1;transform:translateY(0)}
-.lbl{font-size:.68rem;font-weight:700;letter-spacing:.38em;text-transform:uppercase;color:#00e5ff;transition:opacity .85s ease .1s,transform .85s ease .1s}
-.ttl{margin-top:1.1rem;font-size:clamp(2.6rem,5.5vw,5rem);font-weight:800;line-height:1.08;letter-spacing:-.02em;transition:opacity .9s ease .3s,transform .9s ease .3s}
-.ttl .w{color:#fff}.ttl .c{color:#00e5ff}
-.sub{margin-top:1.3rem;font-size:1rem;line-height:1.75;color:rgba(255,255,255,.5);max-width:620px;transition:opacity .85s ease .52s,transform .85s ease .52s}
-.cta{margin-top:2.3rem;display:flex;align-items:center;gap:1rem;transition:opacity .85s ease .72s,transform .85s ease .72s}
-.ft{margin-top:1.3rem;font-size:.72rem;color:rgba(255,255,255,.3);transition:opacity .9s ease .92s}
+.lbl{font-size:.68rem;font-weight:700;letter-spacing:.38em;text-transform:uppercase;color:#0284c7;transition:opacity 1s ease .1s,transform 1s ease .1s}
+.ttl{margin-top:1.1rem;font-size:clamp(2.6rem,5.5vw,5rem);font-weight:800;line-height:1.08;letter-spacing:-.02em;transition:opacity 1s ease .3s,transform 1s ease .3s;color:#0f172a}
+.ttl .w{color:#0f172a}.ttl .c{color:#0284c7}
+.sub{margin-top:1.3rem;font-size:1.1rem;line-height:1.6;color:#475569;max-width:620px;transition:opacity 1s ease .52s,transform 1s ease .52s;font-weight:400}
+.cta{margin-top:2.5rem;display:flex;align-items:center;gap:1rem;transition:opacity 1s ease .72s,transform 1s ease .72s}
+.ft{margin-top:1.5rem;font-size:.75rem;color:#64748b;transition:opacity 1s ease .92s}
 #ui.on .ft{opacity:1}
-.ft .h{color:#00e5ff}
+.ft .h{color:#0284c7;font-weight:600}
 
-.bm{background:#00e5ff;color:#020617;border:none;border-radius:999px;padding:.9rem 2.25rem;font-size:.92rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.5rem;box-shadow:0 0 30px rgba(0,229,255,.45);transition:transform .2s,box-shadow .2s;letter-spacing:.01em}
-.bm:hover{transform:scale(1.05);box-shadow:0 0 50px rgba(0,229,255,.65)}
-.bmic{width:52px;height:52px;border-radius:50%;border:1.5px solid rgba(0,229,255,.45);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;transition:border-color .2s}
-.bmic:hover{border-color:rgba(0,229,255,.85)}
-.bmic::before{content:'';position:absolute;inset:-5px;border-radius:50%;border:1px solid rgba(0,229,255,.35);animation:mpulse 2.6s ease-out infinite}
-@keyframes mpulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.9);opacity:0}}
+.bm{background:#0284c7;color:#ffffff;border:none;border-radius:999px;padding:1rem 2.5rem;font-size:.95rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:.5rem;box-shadow:0 4px 14px rgba(2,132,199,.25);transition:transform .3s,box-shadow .3s;letter-spacing:.01em}
+.bm:hover{transform:scale(1.03) translateY(-1px);box-shadow:0 6px 20px rgba(2,132,199,.35);background:#0369a1}
+.bmic{width:54px;height:54px;border-radius:50%;border:1.5px solid rgba(2,132,199,.3);background:rgba(255,255,255,0.5);backdrop-filter:blur(4px);cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;transition:all .3s}
+.bmic:hover{border-color:rgba(2,132,199,.6);background:rgba(255,255,255,0.9)}
+.bmic::before{content:'';position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(2,132,199,.15);animation:mpulse 3s ease-out infinite}
+@keyframes mpulse{0%{transform:scale(1);opacity:.8}100%{transform:scale(1.8);opacity:0}}
 </style>
 </head>
 <body>
@@ -53,7 +54,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#020617;font-family:
   <div class="u cta">
     <button class="bm" onclick="location.href='/voice'">Talk to Your Twin →</button>
     <button class="bmic" onclick="location.href='/voice'" aria-label="Voice">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="9" y="1" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
       </svg>
     </button>
@@ -74,76 +75,171 @@ html,body{width:100%;height:100%;overflow:hidden;background:#020617;font-family:
   document.getElementById('cv').appendChild(renderer.domElement);
 
   var scene=new THREE.Scene();
-  var camera=new THREE.PerspectiveCamera(60,W/H,0.1,100);
-  camera.position.z=2.5;
+  var camera=new THREE.PerspectiveCamera(50,W/H,0.1,20);
+  camera.position.z=4.5;
 
-  // Glow sprite
-  var sc=document.createElement('canvas');sc.width=sc.height=32;
+  // Soft glow sprite (teal/blue)
+  var sc=document.createElement('canvas');sc.width=sc.height=64;
   var sc2=sc.getContext('2d');
-  var sg=sc2.createRadialGradient(16,16,0,16,16,16);
-  sg.addColorStop(0,'rgba(0,229,255,1)');sg.addColorStop(0.4,'rgba(0,229,255,0.5)');sg.addColorStop(1,'rgba(0,229,255,0)');
-  sc2.fillStyle=sg;sc2.fillRect(0,0,32,32);
-  var sprite=new THREE.CanvasTexture(sc);
+  var sg=sc2.createRadialGradient(32,32,0,32,32,32);
+  sg.addColorStop(0,'rgba(14,165,233,0.8)');
+  sg.addColorStop(0.3,'rgba(14,165,233,0.3)');
+  sg.addColorStop(1,'rgba(14,165,233,0)');
+  sc2.fillStyle=sg;sc2.fillRect(0,0,64,64);
+  var sprite1=new THREE.CanvasTexture(sc);
+
+  // Warm glow sprite (human tint)
+  var scw=document.createElement('canvas');scw.width=scw.height=64;
+  var scw2=scw.getContext('2d');
+  var sgw=scw2.createRadialGradient(32,32,0,32,32,32);
+  sgw.addColorStop(0,'rgba(236,72,153,0.6)');
+  sgw.addColorStop(0.3,'rgba(236,72,153,0.2)');
+  sgw.addColorStop(1,'rgba(236,72,153,0)');
+  scw2.fillStyle=sgw;scw2.fillRect(0,0,64,64);
+  var sprite2=new THREE.CanvasTexture(scw);
 
   // Particles
-  var N=1500,ASP=W/H;
+  var N=800,ASP=W/H;
   var posArr=new Float32Array(N*3),orig=new Float32Array(N*3),ph=new Float32Array(N*4);
-  for(var i=0;i<N;i++){
-    var x=(Math.random()-.5)*4.5*ASP,y=(Math.random()-.5)*4.5,z=(Math.random()-.5)*0.4;
-    orig[i*3]=posArr[i*3]=x;orig[i*3+1]=posArr[i*3+1]=y;orig[i*3+2]=posArr[i*3+2]=z;
-    ph[i*4]=Math.random()*Math.PI*2;ph[i*4+1]=Math.random()*Math.PI*2;
-    ph[i*4+2]=0.12+Math.random()*0.18;ph[i*4+3]=0.12+Math.random()*0.18;
-  }
-  var pGeom=new THREE.BufferGeometry();
-  var posAttr=new THREE.BufferAttribute(posArr,3);
-  pGeom.setAttribute('position',posAttr);
-  var pMat=new THREE.PointsMaterial({map:sprite,color:0x00e5ff,size:4,sizeAttenuation:false,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false});
-  scene.add(new THREE.Points(pGeom,pMat));
+  
+  var pGeom1=new THREE.BufferGeometry();
+  var pGeom2=new THREE.BufferGeometry();
+  var posArr1=[], posArr2=[];
+  var orig1=[], orig2=[];
+  var ph1=[], ph2=[];
 
-  // Connection lines — topology computed once
-  var D2=0.20*0.20,idxA=[],idxB=[];
-  for(var i=0;i<N;i++){var c=0;for(var j=i+1;j<N&&c<3;j++){var dx=orig[i*3]-orig[j*3],dy=orig[i*3+1]-orig[j*3+1];if(dx*dx+dy*dy<D2){idxA.push(i);idxB.push(j);c++;}}}
+  for(var i=0;i<N;i++){
+    // Spread Z widely for depth of field effect
+    var z=(Math.random()-.5)*6.0;
+    // Scale X and Y spread based on Z to fill screen
+    var spread = 6.0 - z*0.5;
+    var x=(Math.random()-.5)*spread*ASP;
+    var y=(Math.random()-.5)*spread;
+    
+    orig[i*3]=posArr[i*3]=x;
+    orig[i*3+1]=posArr[i*3+1]=y;
+    orig[i*3+2]=posArr[i*3+2]=z;
+    
+    ph[i*4]=Math.random()*Math.PI*2;
+    ph[i*4+1]=Math.random()*Math.PI*2;
+    // Slower, biological fluid motion
+    ph[i*4+2]=0.03+Math.random()*0.05;
+    ph[i*4+3]=0.03+Math.random()*0.05;
+
+    // 15% warm tint particles
+    if(Math.random() < 0.15) {
+        posArr2.push(x,y,z); orig2.push(x,y,z);
+        ph2.push(ph[i*4], ph[i*4+1], ph[i*4+2], ph[i*4+3]);
+    } else {
+        posArr1.push(x,y,z); orig1.push(x,y,z);
+        ph1.push(ph[i*4], ph[i*4+1], ph[i*4+2], ph[i*4+3]);
+    }
+  }
+  
+  pGeom1.setAttribute('position',new THREE.BufferAttribute(new Float32Array(posArr1),3));
+  pGeom2.setAttribute('position',new THREE.BufferAttribute(new Float32Array(posArr2),3));
+
+  // Size attenuation true creates natural depth blurring (distant = smaller, close = larger)
+  var pMat1=new THREE.PointsMaterial({map:sprite1,size:0.25,sizeAttenuation:true,transparent:true,opacity:0.45,blending:THREE.NormalBlending,depthWrite:false});
+  var pMat2=new THREE.PointsMaterial({map:sprite2,size:0.22,sizeAttenuation:true,transparent:true,opacity:0.35,blending:THREE.NormalBlending,depthWrite:false});
+  
+  var points1 = new THREE.Points(pGeom1,pMat1);
+  var points2 = new THREE.Points(pGeom2,pMat2);
+  scene.add(points1);
+  scene.add(points2);
+
+  // Connections (thinner, softer, curved illusion via low opacity)
+  var D2=1.0*1.0,idxA=[],idxB=[];
+  for(var i=0;i<N;i++){
+      var c=0;
+      for(var j=i+1;j<N&&c<4;j++){
+          var dx=orig[i*3]-orig[j*3],dy=orig[i*3+1]-orig[j*3+1],dz=orig[i*3+2]-orig[j*3+2];
+          if(dx*dx+dy*dy+dz*dz<D2){idxA.push(i);idxB.push(j);c++;}
+      }
+  }
   var M=idxA.length,lineArr=new Float32Array(M*6);
   var lGeom=new THREE.BufferGeometry(),lAttr=new THREE.BufferAttribute(lineArr,3);
   lGeom.setAttribute('position',lAttr);
-  var lMat=new THREE.LineBasicMaterial({color:0x00e5ff,transparent:true,opacity:0.0,blending:THREE.AdditiveBlending,depthWrite:false});
+  var lMat=new THREE.LineBasicMaterial({color:0x0ea5e9,transparent:true,opacity:0.0,blending:THREE.NormalBlending,depthWrite:false,linewidth:1});
   scene.add(new THREE.LineSegments(lGeom,lMat));
 
-  // Mouse eye parallax (no re-render cost)
+  // Mouse parallax (fluid, organic)
   var eyesInner=document.getElementById('eyes-inner');
+  var targetCamX=0, targetCamY=0;
   document.addEventListener('mousemove',function(e){
-    var ox=((e.clientX-W/2)/(W/2))*8,oy=((e.clientY-H/2)/(H/2))*6;
-    eyesInner.style.transform='translate('+ox+'px,'+oy+'px)';
+    var ox=((e.clientX-W/2)/(W/2));
+    var oy=((e.clientY-H/2)/(H/2));
+    eyesInner.style.transform='translate('+(ox*6)+'px,'+(oy*5)+'px)';
+    targetCamX = ox * 0.4;
+    targetCamY = -oy * 0.4;
   });
 
   // Phase triggers
-  setTimeout(function(){document.getElementById('eyes').classList.add('on');},5000);
-  setTimeout(function(){document.getElementById('ui').classList.add('on');},9000);
+  setTimeout(function(){document.getElementById('eyes').classList.add('on');},3000);
+  setTimeout(function(){document.getElementById('ui').classList.add('on');},4500);
 
-  // Animate
   var clock=new THREE.Clock();
   function animate(){
     requestAnimationFrame(animate);
     var t=clock.getElapsedTime();
-    var p2=ss(clamp((t-3)/2,0,1));   // convergence
-    var p3=ss(clamp((t-5)/2.5,0,1)); // eye phase
-    var p4=ss(clamp((t-7.5)/1.5,0,1)); // camera forward
-    var conv=p2*0.45+p3*0.15;
-    var drift=0.12-conv*0.10;
-    lMat.opacity=0.07+p2*0.15;
+    var p2=ss(clamp((t-1)/3,0,1));   // Slow convergence
+    var conv=p2*0.25;
+    var drift=0.18-conv*0.05;
+    
+    // Very subtle line visibility
+    lMat.opacity=0.04+p2*0.06;
+
+    // Fluid biological movement
+    // Update array 1
+    var pos1 = points1.geometry.attributes.position.array;
+    for(var i=0;i<pos1.length/3;i++){
+      var bx=orig1[i*3]*(1-conv), by=orig1[i*3+1]*(1-conv);
+      pos1[i*3]=bx+Math.sin(t*ph1[i*4+2]+ph1[i*4])*drift;
+      pos1[i*3+1]=by+Math.cos(t*ph1[i*4+3]+ph1[i*4+1])*drift;
+    }
+    points1.geometry.attributes.position.needsUpdate=true;
+
+    // Update array 2
+    var pos2 = points2.geometry.attributes.position.array;
+    for(var i=0;i<pos2.length/3;i++){
+      var bx=orig2[i*3]*(1-conv), by=orig2[i*3+1]*(1-conv);
+      pos2[i*3]=bx+Math.sin(t*ph2[i*4+2]+ph2[i*4])*drift;
+      pos2[i*3+1]=by+Math.cos(t*ph2[i*4+3]+ph2[i*4+1])*drift;
+    }
+    points2.geometry.attributes.position.needsUpdate=true;
+
+    // Update lines
+    for(var k=0;k<M;k++){
+      var a=idxA[k],b=idxB[k];
+      lineArr[k*6]=posArr[a*3]; lineArr[k*6+1]=posArr[a*3+1]; lineArr[k*6+2]=posArr[a*3+2];
+      lineArr[k*6+3]=posArr[b*3]; lineArr[k*6+4]=posArr[b*3+1]; lineArr[k*6+5]=posArr[b*3+2];
+    }
+    // We need to re-map the original indices to the separated arrays for line drawing.
+    // For simplicity in this organic look, we'll let lines distort slightly or we can just reconstruct posArr:
+    var c1=0, c2=0;
     for(var i=0;i<N;i++){
-      var bx=orig[i*3]*(1-conv),by=orig[i*3+1]*(1-conv);
+        if(Math.random() < 0.15 && false) {} // We skipped this tracking, let's just use original posArr for lines to keep it simple, it creates a neat effect
+        // Actually, let's properly map them.
+    }
+    // To keep it simple and performant, we'll just update the unified posArr for lines:
+    for(var i=0;i<N;i++){
+      var bx=orig[i*3]*(1-conv), by=orig[i*3+1]*(1-conv);
       posArr[i*3]=bx+Math.sin(t*ph[i*4+2]+ph[i*4])*drift;
       posArr[i*3+1]=by+Math.cos(t*ph[i*4+3]+ph[i*4+1])*drift;
     }
-    posAttr.needsUpdate=true;
     for(var k=0;k<M;k++){
       var a=idxA[k],b=idxB[k];
-      lineArr[k*6]=posArr[a*3];lineArr[k*6+1]=posArr[a*3+1];lineArr[k*6+2]=0;
-      lineArr[k*6+3]=posArr[b*3];lineArr[k*6+4]=posArr[b*3+1];lineArr[k*6+5]=0;
+      lineArr[k*6]=posArr[a*3]; lineArr[k*6+1]=posArr[a*3+1]; lineArr[k*6+2]=posArr[a*3+2];
+      lineArr[k*6+3]=posArr[b*3]; lineArr[k*6+4]=posArr[b*3+1]; lineArr[k*6+5]=posArr[b*3+2];
     }
     lAttr.needsUpdate=true;
-    camera.position.z=(2.5-p4*0.6)+Math.sin(t*0.55)*0.018;
+
+    // Smooth camera parallax
+    camera.position.x += (targetCamX - camera.position.x) * 0.05;
+    camera.position.y += (targetCamY - camera.position.y) * 0.05;
+    camera.position.z = 4.5 + Math.sin(t*0.4)*0.15;
+    camera.lookAt(0,0,0);
+
     renderer.render(scene,camera);
   }
   animate();

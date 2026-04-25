@@ -17,8 +17,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         className="mt-1 flex-shrink-0 h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold"
         style={
           isUser
-            ? { background: 'rgba(0,229,255,0.15)', border: '1px solid rgba(0,229,255,0.35)', color: '#00e5ff' }
-            : { background: 'rgba(0,229,255,0.08)', border: '1px solid rgba(0,229,255,0.2)',  color: 'rgba(0,229,255,0.7)' }
+            ? { background: '#0284c7', color: 'white', boxShadow: '0 2px 8px rgba(2,132,199,0.2)' }
+            : { background: 'white', border: '1px solid #bae6fd', color: '#0284c7', boxShadow: '0 2px 8px rgba(14,165,233,0.08)' }
         }
       >
         {isUser ? 'You' : 'AI'}
@@ -26,26 +26,25 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
       {/* Bubble */}
       <div
-        className="max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
+        className="max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm"
         style={
           isUser
             ? {
-                background: 'rgba(0,229,255,0.12)',
-                border: '1px solid rgba(0,229,255,0.25)',
-                color: '#e2f8ff',
+                background: '#0284c7',
+                color: 'white',
               }
             : {
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'rgba(255,255,255,0.82)',
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                color: '#1e293b',
               }
         }
       >
         <p className="whitespace-pre-wrap">{message.content}</p>
 
         {message.citations && message.citations.length > 0 && (
-          <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <p className="text-xs mb-2" style={{ color: 'rgba(0,229,255,0.5)' }}>Sources</p>
+          <div className="mt-3 pt-3" style={{ borderTop: '1px solid #e2e8f0' }}>
+            <p className="text-xs mb-2 font-medium" style={{ color: '#64748b' }}>Sources</p>
             {message.citations.map((c, idx) => (
               <a
                 key={c.pmid}
@@ -53,7 +52,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-xs mb-1 hover:underline"
-                style={{ color: 'rgba(0,229,255,0.65)' }}
+                style={{ color: '#0284c7' }}
               >
                 [{idx + 1}] {c.title.substring(0, 60)}… ({c.year})
               </a>
