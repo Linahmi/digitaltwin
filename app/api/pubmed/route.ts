@@ -1,39 +1,35 @@
 /**
- * GET /api/pubmed?q=<query>
+ * GET /api/pubmed?q=<comma-separated topics>
  *
- * Exposes the PubMed evidence layer for manual searching and testing.
- * Uses the SQLite cache internally.
+ * Exposes the evidence layer for manual searching and testing.
+ * Uses the production EvidenceService with rate limiting, in-memory cache,
+ * retry/backoff, and trusted-source fallback.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { getPubMedEvidence } from '@/lib/evidence/pubmed'
-import { buildPubMedQuery } from '@/lib/evidence/evidenceSelector'
+import { NextRequest, NextResponse } from "next/server";
+import { getEvidence } from "@/lib/evidence/evidenceService";
+import { buildPubMedQuery } from "@/lib/evidence/evidenceSelector";
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const q = searchParams.get('q')
+  const { searchParams } = new URL(request.url);
+  const q = searchParams.get("q");
 
   if (!q) {
-    return NextResponse.json({ error: 'Missing query parameter "q"' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Missing query parameter "q"' },
+      { status: 400 }
+    );
   }
 
   try {
-    // If the user provided a raw query, we use it directly, 
-    // but if we want to test the query builder, we could split by space
-    // For this endpoint, we'll just run it through the builder as topics
-    const topics = q.split(',').map(s => s.trim()).filter(Boolean)
-    const formattedQuery = buildPubMedQuery(topics)
-    
-    const evidence = await getPubMedEvidence(formattedQuery)
+    const topics = q.split(",").map((s) => s.trim()).filter(Boolean);
+    const query = buildPubMedQuery(topics);
 
-    return NextResponse.json({
-      query: formattedQuery,
-      citations: evidence.citations,
-      cacheHit: evidence.cacheHit,
-      retrievedAt: evidence.retrievedAt,
-      staleCache: evidence.staleCache,
-    })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const result = await getEvidence(query);
+
+    return NextResponse.json(result);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,151 +1,158 @@
 /**
  * lib/evidence/evidenceSelector.ts
  *
- * Builds targeted PubMed queries and scores/filters retrieved citations
- * to select the most relevant high-quality evidence.
+ * Builds PubMed queries and orchestrates evidence selection via evidenceService.
+ * Keeps its public API stable so the chat route does not require changes.
  */
 
-import { getPubMedEvidence, Citation } from './pubmed'
+import { getEvidence } from "./evidenceService";
+import type { Citation } from "./pubmed";
 
 export interface EvidenceSelection {
-  topics: string[]
-  query: string
-  citations: Citation[]
-  cacheHit: boolean
-  retrievedAt: string | null
-  staleCache: boolean
+  topics: string[];
+  query: string;
+  citations: Citation[];
+  cacheHit: boolean;
+  retrievedAt: string | null;
+  staleCache: boolean;
+  warning?: string;
 }
+
+const TOPIC_SYNONYMS: Record<string, string[]> = {
+  cholesterol: ["cholesterol", "ldl", "hyperlipidemia", "dyslipidemia", "statin"],
+  lipids: ["lipids", "ldl", "hdl", "hyperlipidemia", "dyslipidemia"],
+  "blood pressure": ["blood pressure", "hypertension", "systolic blood pressure"],
+  hypertension: ["hypertension", "blood pressure", "antihypertensive"],
+  "heart disease risk": [
+    "cardiovascular risk",
+    "coronary disease",
+    "atherosclerotic cardiovascular disease",
+  ],
+  diabetes: ["diabetes", "type 2 diabetes", "glycemic control", "hba1c"],
+};
 
 function sanitizeTopic(topic: string): string {
   return topic
-    .replace(/[\[\]()"']/g, ' ')
-    .replace(/\b(?:AND|OR|NOT)\b/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+    .replace(/[\[\]()"']/g, " ")
+    .replace(/\b(?:AND|OR|NOT)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function expandTopic(topic: string): string[] {
+  const cleaned = sanitizeTopic(topic);
+  if (!cleaned) return [];
+  const lower = cleaned.toLowerCase();
+  const expanded = new Set<string>([cleaned]);
+  for (const [key, synonyms] of Object.entries(TOPIC_SYNONYMS)) {
+    if (lower.includes(key) || key.includes(lower)) {
+      for (const syn of synonyms) expanded.add(syn);
+    }
+  }
+  return Array.from(expanded);
 }
 
 export function normalizeTopics(topics: string[]): string[] {
-  const seen = new Set<string>()
-  const normalized: string[] = []
-
+  const seen = new Set<string>();
+  const out: string[] = [];
   for (const topic of topics) {
-    const cleaned = sanitizeTopic(topic)
-    const key = cleaned.toLowerCase()
-
-    if (!cleaned || seen.has(key)) continue
-    seen.add(key)
-    normalized.push(cleaned)
+    for (const expanded of expandTopic(topic)) {
+      const key = expanded.toLowerCase();
+      if (!expanded || seen.has(key)) continue;
+      seen.add(key);
+      out.push(expanded);
+    }
   }
-
-  return normalized.slice(0, 3)
+  return out.slice(0, 5);
 }
 
-/**
- * Builds a structured PubMed query from user topics.
- * Focuses on guidelines, reviews, and meta-analyses.
- */
 export function buildPubMedQuery(topics: string[]): string {
-  const normalizedTopics = normalizeTopics(topics)
-  // Restrict to English, human studies, and high-quality evidence types
-  // Limit to roughly the last 15 years using PubMed date syntax.
-  const currentYear = new Date().getFullYear()
-  const startYear = currentYear - 15
-
-  if (normalizedTopics.length === 0) return ''
-
-  const topicClause = normalizedTopics
-    .map(topic => `("${topic}"[Title/Abstract] OR "${topic}"[MeSH Terms])`)
-    .join(' OR ')
-
-  return `(${topicClause}) AND (guideline[Publication Type] OR meta-analysis[Publication Type] OR systematic[sb] OR review[Publication Type]) AND humans[MeSH Terms] AND english[Language] AND ("${startYear}/01/01"[PDat] : "${currentYear}/12/31"[PDat])`
+  const normalized = normalizeTopics(topics);
+  if (normalized.length === 0) return "";
+  const currentYear = new Date().getFullYear();
+  const startYear = currentYear - 15;
+  const topicClause = normalized
+    .map((t) => `("${t}"[Title/Abstract] OR "${t}"[MeSH Terms])`)
+    .join(" OR ");
+  return `(${topicClause}) AND (guideline[Publication Type] OR meta-analysis[Publication Type] OR systematic[sb] OR review[Publication Type]) AND humans[MeSH Terms] AND english[Language] AND ("${startYear}/01/01"[PDat] : "${currentYear}/12/31"[PDat])`;
 }
 
-/**
- * Scores a citation based on keyword matches, recency, and evidence type.
- */
-function scoreCitation(citation: Citation, topics: string[]): number {
-  let score = 0
-  
-  const titleLower = citation.title.toLowerCase()
-  const journalLower = citation.journal.toLowerCase()
-
-  // 1. Evidence Type Bonus
-  if (titleLower.includes('guideline') || titleLower.includes('recommendation')) score += 10
-  if (titleLower.includes('meta-analysis')) score += 8
-  if (titleLower.includes('systematic review')) score += 7
-  if (titleLower.includes('review')) score += 5
-  if (titleLower.includes('case report')) score -= 10 // Deprioritize
-
-  // 2. Recency Bonus
-  const year = parseInt(citation.year, 10)
-  if (!isNaN(year)) {
-      const currentYear = new Date().getFullYear()
-      const age = currentYear - year
-      if (age <= 3) score += 5
-      else if (age <= 7) score += 3
-      else if (age <= 10) score += 1
-      else if (age > 15) score -= 5 // Very old
-  }
-
-  // 3. Keyword Match
-  for (const topic of topics) {
-      if (titleLower.includes(topic.toLowerCase())) score += 2
-  }
-
-  // High-impact journals (simplified heuristic)
-  if (journalLower.includes('jama') || journalLower.includes('lancet') || journalLower.includes('new england journal') || journalLower.includes('nejm')) {
-      score += 3
-  }
-
-  return score
+function buildFallbackQueries(topics: string[]): string[] {
+  const normalized = normalizeTopics(topics);
+  if (normalized.length === 0) return [];
+  const currentYear = new Date().getFullYear();
+  const startYear = currentYear - 15;
+  const titleClause = normalized.map((t) => `"${t}"[Title/Abstract]`).join(" OR ");
+  return [
+    buildPubMedQuery(normalized),
+    `(${titleClause}) AND humans[MeSH Terms] AND english[Language] AND ("${startYear}/01/01"[PDat] : "${currentYear}/12/31"[PDat])`,
+    `${normalized.join(" ")} AND humans[MeSH Terms] AND english[Language]`,
+    normalized.join(" OR "),
+  ];
 }
 
-/**
- * Fetches and selects the top 2-3 most relevant citations for the given topics.
- */
 export async function getTopEvidence(topics: string[]): Promise<EvidenceSelection> {
-  const normalizedTopics = normalizeTopics(topics)
+  const normalizedTopics = normalizeTopics(topics);
   if (normalizedTopics.length === 0) {
-    return {
-      topics: [],
-      query: '',
-      citations: [],
-      cacheHit: false,
-      retrievedAt: null,
-      staleCache: false,
+    return { topics: [], query: "", citations: [], cacheHit: false, retrievedAt: null, staleCache: false };
+  }
+
+  const queries = buildFallbackQueries(normalizedTopics);
+
+  for (const query of queries) {
+    const result = await getEvidence(query);
+
+    // Stop at the first query that returns PubMed results (not fallback/unavailable).
+    if (
+      result.references.length > 0 &&
+      result.primarySourceUsed === "pubmed"
+    ) {
+      const citations: Citation[] = result.references.map((ref) => ({
+        pmid: "",
+        title: ref.title,
+        authors: [],
+        journal: ref.source,
+        year: ref.year ?? "Unknown",
+        url: ref.url,
+        abstract: ref.abstract,
+        publicationTypes: ref.type ? [ref.type] : [],
+        evidenceType: ref.type,
+      }));
+
+      return {
+        topics: normalizedTopics,
+        query,
+        citations: citations.slice(0, 3),
+        cacheHit: false,
+        retrievedAt: new Date().toISOString(),
+        staleCache: false,
+        warning: result.warning,
+      };
     }
   }
 
-  const query = buildPubMedQuery(normalizedTopics)
-  
-  try {
-    const evidence = await getPubMedEvidence(query)
-    
-    // Score and sort
-    const scored = evidence.citations.map(c => ({
-        ...c,
-        relevanceScore: scoreCitation(c, normalizedTopics)
-    }))
+  // All PubMed queries failed — try the trusted fallback on the primary query.
+  const fallbackResult = await getEvidence(normalizedTopics.join(" "));
+  const isTrusted = fallbackResult.primarySourceUsed === "trusted_fallback";
+  const citations: Citation[] = fallbackResult.references.map((ref) => ({
+    pmid: "",
+    title: ref.title,
+    authors: [],
+    journal: ref.source,
+    year: ref.year ?? "Unknown",
+    url: ref.url,
+    abstract: ref.abstract,
+    publicationTypes: ref.type ? [ref.type] : [],
+    evidenceType: ref.type,
+  }));
 
-    scored.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
-
-    return {
-      topics: normalizedTopics,
-      query,
-      citations: scored.slice(0, 3),
-      cacheHit: evidence.cacheHit,
-      retrievedAt: evidence.retrievedAt,
-      staleCache: evidence.staleCache,
-    }
-  } catch (err) {
-    console.error("Evidence selection failed:", err)
-    return {
-      topics: normalizedTopics,
-      query,
-      citations: [],
-      cacheHit: false,
-      retrievedAt: null,
-      staleCache: false,
-    }
-  }
+  return {
+    topics: normalizedTopics,
+    query: queries[0] ?? "",
+    citations: citations.slice(0, 3),
+    cacheHit: false,
+    retrievedAt: new Date().toISOString(),
+    staleCache: isTrusted,
+    warning: fallbackResult.warning,
+  };
 }

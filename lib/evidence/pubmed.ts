@@ -54,6 +54,14 @@ async function searchPubMed(query: string): Promise<string[]> {
   return data.esearchresult?.idlist || []
 }
 
+function isRateLimitError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('429')
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms))
+}
+
 function decodeXmlEntities(value: string): string {
   return value
     .replace(/&lt;/g, '<')
@@ -116,6 +124,26 @@ async function fetchPubMedAbstracts(pmids: string[]): Promise<Record<string, { a
   return detailsByPmid
 }
 
+async function fetchPubMedAbstractsWithRetry(pmids: string[]): Promise<Record<string, { abstract?: string; publicationTypes: string[] }>> {
+  try {
+    return await fetchPubMedAbstracts(pmids)
+  } catch (error) {
+    if (!isRateLimitError(error)) throw error
+
+    await sleep(700)
+
+    try {
+      return await fetchPubMedAbstracts(pmids)
+    } catch (retryError) {
+      if (isRateLimitError(retryError)) {
+        console.warn('PubMed abstract fetch rate-limited; continuing with metadata-only citations')
+        return {}
+      }
+      throw retryError
+    }
+  }
+}
+
 /**
  * Fetches citation details for a list of PMIDs via ESummary.
  */
@@ -129,10 +157,7 @@ async function fetchPubMedDetails(pmids: string[]): Promise<Citation[]> {
   url.searchParams.append('tool', TOOL_NAME)
   url.searchParams.append('email', EMAIL)
 
-  const [summaryResponse, abstractsByPmid] = await Promise.all([
-    fetch(url.toString()),
-    fetchPubMedAbstracts(pmids),
-  ])
+  const summaryResponse = await fetch(url.toString())
 
   if (!summaryResponse.ok) {
     throw new Error(`ESummary failed: ${summaryResponse.status} ${summaryResponse.statusText}`)
@@ -140,6 +165,7 @@ async function fetchPubMedDetails(pmids: string[]): Promise<Citation[]> {
 
   const data = await summaryResponse.json()
   const result = data.result || {}
+  const abstractsByPmid = await fetchPubMedAbstractsWithRetry(pmids)
   
   const citations: Citation[] = []
   
