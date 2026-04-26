@@ -5,7 +5,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Digital Health Twin',
+  title: 'Dualis',
   description: 'Your AI-powered health companion',
 }
 

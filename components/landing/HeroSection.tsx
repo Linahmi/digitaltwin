@@ -37,7 +37,7 @@ export function HeroSection() {
               className="text-xs font-semibold uppercase tracking-widest"
               style={{ color: CYAN }}
             >
-              Digital Health Twin
+              Dualis
             </motion.p>
 
             {/* Headline */}
@@ -110,7 +110,7 @@ export function HeroSection() {
               <Mic className="h-7 w-7" style={{ color: CYAN }} />
             </motion.div>
             <p className="text-sm uppercase tracking-widest text-slate-400">
-              Initializing your twin…
+              Initializing Dualis…
             </p>
           </motion.div>
         )}

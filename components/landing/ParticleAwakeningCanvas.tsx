@@ -194,7 +194,7 @@ export function ParticleAwakeningCanvas() {
         {/* Text */}
         <div className="mt-10 flex flex-col items-center text-center">
           <motion.p {...fade(6.0)} className="text-xs font-semibold uppercase tracking-widest text-cyan-400">
-            Digital Health Twin
+            Dualis
           </motion.p>
           <motion.h1 {...fade(6.2)} className="mt-3 text-5xl font-bold text-white lg:text-6xl">
             Meet Your Future Self

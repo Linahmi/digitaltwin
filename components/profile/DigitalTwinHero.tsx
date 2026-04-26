@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 
 import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
@@ -92,6 +92,31 @@ export function DigitalTwinHero({
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(214,233,255,0.58),rgba(236,244,252,0.26)_24%,rgba(243,247,251,0.03)_48%,transparent_76%)]" />
+      <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden">
+        <div
+          className="relative flex h-full w-full items-center justify-center"
+          style={{
+            WebkitMaskImage: 'radial-gradient(circle, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 80%)',
+            maskImage: 'radial-gradient(circle, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 80%)',
+          }}
+        >
+          <Image
+            src="/dualis-logo.png"
+            alt=""
+            aria-hidden="true"
+            width={900}
+            height={900}
+            priority
+            className="h-[68vh] w-auto max-w-[78%] object-contain blur-[20px]"
+            style={{
+              opacity: 0.045,
+              mixBlendMode: 'soft-light',
+              filter: 'grayscale(0.15) saturate(0.5) blur(20px)',
+              boxShadow: '0 0 120px rgba(100,150,255,0.08)',
+            }}
+          />
+        </div>
+      </div>
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-[720px] w-[720px] -translate-x-1/2 -translate-y-[49%] rounded-full bg-[radial-gradient(circle,rgba(173,211,255,0.22),rgba(224,238,255,0.1)_32%,rgba(240,247,252,0.015)_54%,transparent_76%)] blur-[10px]" />
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-[560px] w-[560px] -translate-x-1/2 -translate-y-[43%] rounded-full border border-sky-200/14" />
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-[486px] w-[486px] -translate-x-1/2 -translate-y-[39%] rounded-full border border-sky-100/10" />

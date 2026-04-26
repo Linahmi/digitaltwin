@@ -1,7 +1,9 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import {
+  ArrowLeft,
   ChevronRight,
   Dna,
   HeartPulse,
@@ -381,31 +383,71 @@ export function ReportDashboardClient({ data }: { data: ReportDashboardData }) {
   return (
     <div className="h-screen overflow-hidden bg-[linear-gradient(180deg,#fbfdff_0%,#f3f7fb_100%)] text-slate-900">
       <main className="mx-auto flex h-full max-w-[1500px] flex-col px-[14px] py-[14px]">
+        {/* ── HEADER ── */}
+        <header className="mb-6 flex items-center justify-between">
+          <Link 
+            href="/voice" 
+            className="group flex items-center gap-2 text-[13px] font-medium text-gray-500 transition-colors hover:text-gray-900"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+            <span>Back to Voice</span>
+          </Link>
+          
+          <div className="flex items-center gap-3 rounded-full border border-white/75 bg-white/66 px-3 py-2 shadow-[0_8px_20px_rgba(15,23,42,0.04)] backdrop-blur-[14px]">
+            <div className="relative h-8 w-8 overflow-hidden rounded-xl border border-sky-100/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(239,246,255,0.92))] shadow-[0_8px_20px_rgba(59,130,246,0.08)]">
+              <Image
+                src="/dualis-logo.png"
+                alt="Dualis"
+                width={160}
+                height={160}
+                priority
+                className="h-full w-full scale-[2.2] object-cover object-top"
+                style={{ transformOrigin: 'center 22%' }}
+              />
+            </div>
+            <span className="text-[11px] font-semibold tracking-[0.22em] text-slate-600">DUALIS</span>
+          </div>
+        </header>
+
         <section className="flex flex-1 min-h-0 flex-col gap-3 xl:grid xl:grid-cols-[240px_minmax(600px,1fr)_260px] xl:grid-rows-[minmax(0,1fr)_150px] xl:gap-3">
 
           {/* ── LEFT PANEL ── */}
           <div className="space-y-2.5 xl:min-h-0 xl:overflow-y-auto xl:pr-0.5">
 
-            <section className="space-y-1.5 rounded-[20px] border border-white/80 bg-[rgba(255,255,255,0.72)] p-[11px] shadow-[0_8px_20px_rgba(15,23,42,0.035)] backdrop-blur-[18px]">
-              <div className="text-[9px] uppercase tracking-[0.22em] text-slate-400">Pulmonary function</div>
-              <div className="text-[10px] text-slate-500">Latest respiratory observation</div>
-              <div className="text-[22px] font-semibold leading-none tracking-tight text-slate-950">N/A</div>
-              <p className="text-[10px] leading-[1.42] text-slate-600">
-                {data.activeConditions.find((c) => /respiratory|pneumonia|hypoxemia|cough/i.test(c)) ??
-                  'No active respiratory condition in current record.'}
-              </p>
+            <section className="group relative space-y-1.5 rounded-[20px] border border-white/80 bg-[rgba(255,255,255,0.72)] p-[11px] shadow-[0_8px_20px_rgba(15,23,42,0.035)] backdrop-blur-[18px]">
+              <div className="flex items-center justify-between">
+                <div className="text-[9px] uppercase tracking-[0.22em] text-slate-400">Pulmonary function</div>
+                {!data.activeConditions.some((c) => /respiratory|pneumonia|hypoxemia|cough/i.test(c)) && (
+                  <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold text-slate-400">No data</span>
+                )}
+              </div>
+              <div className={`transition-opacity duration-300 ${!data.activeConditions.some((c) => /respiratory|pneumonia|hypoxemia|cough/i.test(c)) ? 'opacity-65' : ''}`}>
+                <div className="text-[10px] text-slate-500">Latest respiratory observation</div>
+                <div className={`text-[22px] font-semibold leading-none tracking-tight ${!data.activeConditions.some((c) => /respiratory|pneumonia|hypoxemia|cough/i.test(c)) ? 'text-slate-400' : 'text-slate-950'}`}>
+                  {data.activeConditions.find((c) => /respiratory|pneumonia|hypoxemia|cough/i.test(c)) ? 'Active' : 'No data recorded'}
+                </div>
+                <p className={`mt-1 text-[10px] leading-[1.42] ${!data.activeConditions.some((c) => /respiratory|pneumonia|hypoxemia|cough/i.test(c)) ? 'text-slate-400' : 'text-slate-600'}`}>
+                  {data.activeConditions.find((c) => /respiratory|pneumonia|hypoxemia|cough/i.test(c)) ??
+                    'No pulmonary function tests available in the current record.'}
+                </p>
+              </div>
             </section>
 
-            <section className="space-y-1.5 rounded-[20px] border border-white/80 bg-[rgba(255,255,255,0.72)] p-[11px] shadow-[0_8px_20px_rgba(15,23,42,0.035)] backdrop-blur-[18px]">
+            <section className="group relative space-y-1.5 rounded-[20px] border border-white/80 bg-[rgba(255,255,255,0.72)] p-[11px] shadow-[0_8px_20px_rgba(15,23,42,0.035)] backdrop-blur-[18px]">
               <div className="flex items-center justify-between">
                 <div className="text-[9px] uppercase tracking-[0.22em] text-slate-400">Genetic</div>
-                <Dna className="h-3.5 w-3.5 text-slate-300" />
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] font-bold text-slate-400">No data</span>
+                  <Dna className="h-3.5 w-3.5 text-slate-300" />
+                </div>
               </div>
-              <div className="text-[10px] text-slate-500">Variant (SNP)</div>
-              <div className="text-[12px] font-semibold text-slate-900">N/A</div>
-              <p className="text-[10px] leading-[1.42] text-slate-600">
-                No genomic observations present in the imported Synthea dataset.
-              </p>
+              <div className="opacity-65 transition-opacity duration-300">
+                <div className="text-[10px] text-slate-500">Variant (SNP)</div>
+                <div className="text-[12px] font-semibold text-slate-400">No data recorded</div>
+                <p className="text-[10px] leading-[1.42] text-slate-400">
+                  No genomic data available for this patient.
+                </p>
+              </div>
             </section>
 
             <section className="space-y-1.5 rounded-[20px] border border-white/80 bg-[rgba(255,255,255,0.72)] p-[11px] shadow-[0_8px_20px_rgba(15,23,42,0.035)] backdrop-blur-[18px]">
@@ -456,36 +498,60 @@ export function ReportDashboardClient({ data }: { data: ReportDashboardData }) {
           {/* ── RIGHT PANEL ── */}
           <div className="space-y-2.5 xl:min-h-0 xl:overflow-y-auto xl:pl-0.5">
 
-            <section className="space-y-1.5 rounded-[20px] border border-white/80 bg-[rgba(255,255,255,0.72)] p-[11px] shadow-[0_8px_20px_rgba(15,23,42,0.035)] backdrop-blur-[18px]">
+            <section className="space-y-3 rounded-[20px] border border-white/80 bg-[rgba(255,255,255,0.72)] p-[15px] shadow-[0_8px_20px_rgba(15,23,42,0.035)] backdrop-blur-[18px]">
               <div className="flex items-center justify-between">
-                <div className="text-[9px] uppercase tracking-[0.22em] text-slate-400">Progress</div>
-                <div className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${progressTone}`}>{achievedGoals}/5 goals</div>
+                <div className="text-[9px] uppercase tracking-[0.22em] text-slate-400">Treatment adherence</div>
+                <div className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider opacity-60 ${progressTone}`}>
+                  {achievedGoals}/5 goals
+                </div>
               </div>
-              <div className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${progressTone}`}>
-                {achievedGoals >= 4 ? 'Good' : achievedGoals >= 2 ? 'Fair' : 'Needs focus'}
-              </div>
-              <div className="relative h-[100px] w-[158px] overflow-hidden">
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      'conic-gradient(from 180deg at 50% 100%, rgba(196,210,227,0.82) 0deg 180deg, transparent 180deg 360deg)',
-                    borderTopLeftRadius: '999px',
-                    borderTopRightRadius: '999px',
-                  }}
-                />
-                <div
-                  className="absolute inset-x-3 top-3 h-[calc(100%-12px)]"
-                  style={{
-                    background: `conic-gradient(from 180deg at 50% 100%, #2563eb 0deg, #38bdf8 ${(achievedGoals / 5) * 92}deg, #34d399 ${(achievedGoals / 5) * 180}deg, #d6dfeb ${(achievedGoals / 5) * 180}deg 180deg, transparent 180deg 360deg)`,
-                    borderTopLeftRadius: '999px',
-                    borderTopRightRadius: '999px',
-                  }}
-                />
-                <div className="absolute inset-x-6 bottom-0 top-6 rounded-t-[999px] bg-[linear-gradient(180deg,#fbfdff,#f4f8fc)]" />
-                <div className="absolute inset-x-0 bottom-2 text-center">
-                  <div className="text-[9px] uppercase tracking-[0.2em] text-slate-400">Goals</div>
-                  <div className="mt-0.5 text-[22px] font-semibold leading-none tracking-tight text-slate-950">{achievedGoals}/5</div>
+
+              <div className="flex flex-col items-center">
+                <div className="relative h-[85px] w-[160px]">
+                  {/* Progress Gauge SVG */}
+                  <svg viewBox="0 0 100 55" className="h-full w-full overflow-visible">
+                    <path
+                      d="M 10 50 A 40 40 0 0 1 90 50"
+                      fill="none"
+                      stroke="#f1f5f9"
+                      strokeWidth="7"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M 10 50 A 40 40 0 0 1 90 50"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="7"
+                      strokeLinecap="round"
+                      strokeDasharray={125.6}
+                      strokeDashoffset={125.6 * (1 - (achievedGoals / 5))}
+                      className={`transition-all duration-1000 ease-out ${
+                        achievedGoals >= 4 ? 'text-emerald-500' : achievedGoals >= 2 ? 'text-amber-500' : 'text-rose-500'
+                      }`}
+                    />
+                  </svg>
+
+                  {/* Centered Content */}
+                  <div className="absolute inset-x-0 bottom-0 flex flex-col items-center justify-end pb-1">
+                    <div className="text-[24px] font-bold leading-none tracking-tight text-slate-950">
+                      {achievedGoals}<span className="text-slate-300">/5</span>
+                    </div>
+                    <div className={`text-[10px] font-bold uppercase tracking-wider ${
+                      achievedGoals >= 4 ? 'text-emerald-600' : achievedGoals >= 2 ? 'text-amber-600' : 'text-rose-600'
+                    }`}>
+                      {achievedGoals >= 4 ? 'Good progress' : achievedGoals >= 2 ? 'Fair progress' : 'Needs focus'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Subtext */}
+                <div className="mt-3 flex w-full flex-col items-center border-t border-slate-100/50 pt-3">
+                  <div className="text-[10px] font-medium text-slate-500">{Math.round((achievedGoals / 5) * 100)}% complete</div>
+                  {achievedGoals < 5 && (
+                    <div className="mt-0.5 text-[9px] text-slate-400">
+                      +{achievedGoals < 2 ? 2 - achievedGoals : achievedGoals < 4 ? 4 - achievedGoals : 1} goal{achievedGoals < 4 ? 's' : ''} to reach {achievedGoals < 2 ? 'Fair' : 'Good'}
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
