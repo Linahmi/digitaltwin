@@ -47,6 +47,70 @@ interface AnswerReview {
   revisedAnswer?: string
 }
 
+const CLINICIAN_RESPONSE_FORMAT = `You are an expert physician analyzing a fully known patient using complete medical history, labs, vitals, and lifestyle data from Synthea.
+
+Your role is to behave like a real clinician:
+- You MUST provide a useful medical interpretation for every question
+- You are allowed to infer, hypothesize, and reason even if direct evidence is incomplete
+- You MUST NOT refuse to answer simply because PubMed or retrieved evidence is insufficient
+
+HOW TO ANSWER
+
+Always structure your response in 4 parts:
+
+1. CLINICAL ANSWER
+Give a clear, direct answer to the question (no refusal, no hedging)
+
+2. REASONING
+Explain step-by-step using:
+- patient-specific data (labs, vitals, age, BMI, history)
+- known medical relationships (e.g., obesity -> insulin resistance -> CV risk)
+
+3. ASSUMPTIONS (if needed)
+If data is missing, state reasonable clinical assumptions
+
+4. CONFIDENCE LEVEL
+(low / moderate / high) based on data completeness
+
+IMPORTANT RULES
+
+- Do NOT say: "I cannot determine" unless absolutely impossible
+- Do NOT rely only on retrieved evidence
+- Use clinical judgment like a doctor would in real life
+- If the question is predictive ("what if..."), simulate realistic physiological changes
+- If the question is diagnostic, give the most likely explanation (not certainty)
+
+SIMULATION MODE (VERY IMPORTANT)
+
+When the user asks about changes (exercise, weight loss, diet, medication):
+
+You MUST:
+- simulate expected changes in:
+  - body composition (fat %, muscle)
+  - biomarkers (HbA1c, LDL, BP, HR)
+  - risk scores
+- explain WHY these changes happen physiologically
+- keep it realistic (not exaggerated)
+
+SAFETY BOUNDARY
+
+If the user asks something like:
+"Do I have cancer?"
+
+You should:
+- NOT give a definitive diagnosis
+- BUT still provide:
+  - risk interpretation
+  - relevant clinical reasoning
+  - what signs/data would confirm or rule it out
+
+STYLE
+
+- Think like a senior doctor, not a chatbot
+- Be concise but insightful
+- No generic disclaimers
+- No unnecessary apologies`
+
 function stripMarkdown(text: string): string {
   return text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
 }
@@ -132,15 +196,6 @@ function buildEvidenceContext(citations: Array<{
   }).join('\n')
 }
 
-function buildEvidenceUnavailableResponse(evidence: EvidenceResponsePayload) {
-  return NextResponse.json({
-    response: "I can't answer that safely right now because I couldn't retrieve verified PubMed evidence for your question.",
-    citations: [],
-    evidence,
-    grounded: false,
-  })
-}
-
 async function reviewAnswer({
   question,
   draftAnswer,
@@ -153,7 +208,7 @@ async function reviewAnswer({
   const reviewResponse = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 220,
-    system: 'You review medical answers for evidence-grounding. Return ONLY valid JSON with keys satisfactory:boolean and revisedAnswer:string. Mark satisfactory false if the answer misses part of the user question, overstates the evidence, or is not clearly supported by the supplied PubMed evidence. If false, provide a safer revisedAnswer that answers the full question using only the supplied evidence.',
+    system: 'You review medical answers for clinical soundness and evidence-grounding. Return ONLY valid JSON with keys satisfactory:boolean and revisedAnswer:string. Mark satisfactory false if the answer misses part of the question, overstates the supplied evidence, ignores important patient context, or fails to keep a useful medical interpretation when evidence is limited. If false, provide a safer revisedAnswer that still answers the full question, clearly separates patient-specific reasoning from evidence limitations, and preserves the required 4-part structure.',
     messages: [{
       role: 'user',
       content: `Question:\n${question}\n\nPubMed evidence:\n${evidenceContext}\n\nDraft answer:\n${draftAnswer}`,
@@ -255,11 +310,9 @@ export async function POST(request: NextRequest) {
         warning: selectedEvidence.warning,
       }
 
-      if (citations.length === 0) {
-        return buildEvidenceUnavailableResponse(evidence)
-      }
-
-      evidenceContext = buildEvidenceContext(citations)
+      evidenceContext = citations.length > 0
+        ? buildEvidenceContext(citations)
+        : 'No directly retrieved PubMed citations were available for this question. Use the patient context and clinical reasoning, and be explicit about assumptions and confidence.'
     } catch (err) {
       console.error('Failed to fetch evidence:', err)
       const selectedEvidence = await getTopEvidence(buildFallbackTopics(message))
@@ -275,11 +328,9 @@ export async function POST(request: NextRequest) {
         warning: selectedEvidence.warning,
       }
 
-      if (citations.length === 0) {
-        return buildEvidenceUnavailableResponse(evidence)
-      }
-
-      evidenceContext = buildEvidenceContext(citations)
+      evidenceContext = citations.length > 0
+        ? buildEvidenceContext(citations)
+        : 'No directly retrieved PubMed citations were available for this question. Use the patient context and clinical reasoning, and be explicit about assumptions and confidence.'
     }
 
     // ── Build system prompt ───────────────────────────────────────────────
@@ -323,11 +374,14 @@ VOICE BEHAVIOR:
 
 CLINICAL GROUND RULES (non-negotiable):
 1. Do not diagnose definitively.
-2. Use ONLY the provided PubMed evidence — never invent citations or studies.
-3. If evidence is weak or missing, say so. Do not cite thresholds not in the evidence.
+2. Use the provided evidence when available, but you may also use standard clinical reasoning from the patient's data. Never invent citations or studies.
+3. If evidence is weak or missing, say so clearly while still giving a useful clinical interpretation. Distinguish direct evidence from inference.
 4. If data is missing or shown as N/A, name what is missing explicitly.
 5. For urgent or serious symptoms, advise contacting a physician or emergency care.
 6. Never say "I don't know" alone — say what can be inferred and what data would clarify.
+
+ANSWER FORMAT (mandatory):
+${CLINICIAN_RESPONSE_FORMAT}
 
 Patient Clinical Context (from Synthea database):
 ${patientContext}
@@ -355,7 +409,7 @@ Speak as the twin. Speak as "we".`
     })
     const finalAnswer = reviewed.satisfactory
       ? assistantMessage
-      : (reviewed.revisedAnswer || "I can't answer that safely right now because the retrieved evidence did not support a complete answer to your question.")
+      : (reviewed.revisedAnswer || assistantMessage)
 
     return NextResponse.json({
       response: finalAnswer,

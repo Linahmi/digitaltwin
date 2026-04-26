@@ -1,7 +1,7 @@
  'use client'
 
 import Image from 'next/image'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 type MarkerId = 'head' | 'chest' | 'abdomen'
 
@@ -20,6 +20,8 @@ interface DigitalTwinHeroProps {
   heartRate: string
   ldl: string
   triglycerides: string
+  simulatedImageUrl?: string | null
+  isGenerating?: boolean
 }
 
 const markers: Marker[] = [
@@ -53,9 +55,16 @@ export function DigitalTwinHero({
   heartRate,
   ldl,
   triglycerides,
+  simulatedImageUrl,
+  isGenerating = false,
 }: DigitalTwinHeroProps) {
   const [activeMarker, setActiveMarker] = useState<MarkerId>('chest')
   const [imageReady, setImageReady] = useState(false)
+  const [simulatedImageReady, setSimulatedImageReady] = useState(false)
+
+  useEffect(() => {
+    setSimulatedImageReady(false)
+  }, [simulatedImageUrl])
 
   const markerDetails = useMemo(
     () => ({
@@ -120,7 +129,7 @@ export function DigitalTwinHero({
             height={2048}
             priority
             onLoad={() => setImageReady(true)}
-            className={`select-none object-contain object-center mix-blend-multiply transition-opacity duration-500 ease-in-out ${
+            className={`select-none object-contain object-center mix-blend-multiply transition-[opacity,filter] duration-500 ease-in-out ${
               imageReady ? 'opacity-100' : 'opacity-0'
             }`}
             style={{
@@ -129,14 +138,49 @@ export function DigitalTwinHero({
               maxHeight: 'clamp(460px, 72vh, 860px)',
               maxWidth: '100%',
               WebkitMaskImage:
-                'radial-gradient(ellipse 48% 86% at 50% 48%, black 0%, black 50%, rgba(0,0,0,0.82) 62%, rgba(0,0,0,0.35) 78%, transparent 92%)',
+                'radial-gradient(ellipse 48% 78% at 50% 60%, black 0%, black 50%, rgba(0,0,0,0.82) 62%, rgba(0,0,0,0.35) 78%, transparent 92%)',
               maskImage:
-                'radial-gradient(ellipse 48% 86% at 50% 48%, black 0%, black 50%, rgba(0,0,0,0.82) 62%, rgba(0,0,0,0.35) 78%, transparent 92%)',
+                'radial-gradient(ellipse 48% 78% at 50% 60%, black 0%, black 50%, rgba(0,0,0,0.82) 62%, rgba(0,0,0,0.35) 78%, transparent 92%)',
               mixBlendMode: 'multiply',
-              opacity: 0.94,
-              filter: 'contrast(1.03) saturate(0.96) brightness(1.01)',
+              opacity: simulatedImageUrl && simulatedImageReady ? 0 : 0.94,
+              filter: isGenerating
+                ? 'contrast(1.03) saturate(0.96) brightness(1.01) blur(5px)'
+                : 'contrast(1.03) saturate(0.96) brightness(1.01)',
             }}
           />
+
+          {simulatedImageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={simulatedImageUrl}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute select-none object-contain mix-blend-multiply"
+              style={{
+                height: 'auto',
+                width: 'auto',
+                maxHeight: 'clamp(460px, 72vh, 860px)',
+                maxWidth: '100%',
+                WebkitMaskImage:
+                  'radial-gradient(ellipse 48% 78% at 50% 60%, black 0%, black 50%, rgba(0,0,0,0.82) 62%, rgba(0,0,0,0.35) 78%, transparent 92%)',
+                maskImage:
+                  'radial-gradient(ellipse 48% 78% at 50% 60%, black 0%, black 50%, rgba(0,0,0,0.82) 62%, rgba(0,0,0,0.35) 78%, transparent 92%)',
+                opacity: simulatedImageReady ? 0.94 : 0,
+                transition: 'opacity 300ms ease-in-out',
+                filter: 'contrast(1.03) saturate(0.96) brightness(1.01)',
+              }}
+              onLoad={() => setSimulatedImageReady(true)}
+            />
+          )}
+
+          {isGenerating && (
+            <div className="pointer-events-none absolute inset-0 z-[5] flex items-end justify-center pb-16">
+              <div className="absolute inset-0 animate-pulse rounded-full bg-sky-100/18" />
+              <div className="relative rounded-full border border-sky-200/40 bg-white/80 px-3.5 py-1.5 text-[10px] tracking-[0.2em] text-slate-500 shadow-sm backdrop-blur-sm">
+                Simulating scenario...
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

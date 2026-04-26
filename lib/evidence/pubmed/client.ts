@@ -1,6 +1,7 @@
 import { rateLimiter } from "./rateLimiter";
 
 const BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+const REQUEST_TIMEOUT_MS = 12000;
 
 export type RequestType = "esearch" | "esummary" | "efetch";
 
@@ -34,7 +35,28 @@ async function fetchWithRetry(
     `[evidence:${reqType}] attempt=${attempt} url=${url.split("?")[0]}`
   );
 
-  const res = await fetch(url);
+  let res: Response;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      res = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.name : "unknown";
+    if (attempt >= 3) {
+      throw new Error(`[evidence:${reqType}] network failure after 3 retries (${reason})`);
+    }
+    const delay = withJitter(([1000, 2000, 4000][attempt] ?? 4000));
+    console.warn(
+      `[evidence:${reqType}] network failure=${reason} attempt=${attempt} retrying delay=${Math.round(delay)}ms`
+    );
+    await sleep(delay);
+    return fetchWithRetry(url, reqType, attempt + 1);
+  }
+
   console.log(`[evidence:${reqType}] status=${res.status} attempt=${attempt}`);
 
   if (res.ok) return res;

@@ -31,6 +31,36 @@ const TOPIC_SYNONYMS: Record<string, string[]> = {
   diabetes: ["diabetes", "type 2 diabetes", "glycemic control", "hba1c"],
 };
 
+const TOPIC_STOPWORDS = new Set([
+  "what",
+  "when",
+  "where",
+  "why",
+  "how",
+  "does",
+  "do",
+  "is",
+  "are",
+  "can",
+  "could",
+  "would",
+  "should",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "of",
+  "to",
+  "for",
+  "with",
+  "in",
+  "on",
+  "my",
+  "our",
+  "your",
+]);
+
 function sanitizeTopic(topic: string): string {
   return topic
     .replace(/[\[\]()"']/g, " ")
@@ -52,15 +82,27 @@ function expandTopic(topic: string): string[] {
   return Array.from(expanded);
 }
 
+function simplifyTopic(topic: string): string {
+  const parts = sanitizeTopic(topic)
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !TOPIC_STOPWORDS.has(word));
+
+  return parts.slice(0, 4).join(" ");
+}
+
 export function normalizeTopics(topics: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const topic of topics) {
-    for (const expanded of expandTopic(topic)) {
+    const candidates = [topic, simplifyTopic(topic)].filter(Boolean);
+    for (const candidate of candidates) {
+      for (const expanded of expandTopic(candidate)) {
       const key = expanded.toLowerCase();
       if (!expanded || seen.has(key)) continue;
       seen.add(key);
       out.push(expanded);
+      }
     }
   }
   return out.slice(0, 5);
@@ -71,9 +113,10 @@ export function buildPubMedQuery(topics: string[]): string {
   if (normalized.length === 0) return "";
   const currentYear = new Date().getFullYear();
   const startYear = currentYear - 15;
-  const topicClause = normalized
+  const primaryTopics = normalized.slice(0, 3);
+  const topicClause = primaryTopics
     .map((t) => `("${t}"[Title/Abstract] OR "${t}"[MeSH Terms])`)
-    .join(" OR ");
+    .join(" AND ");
   return `(${topicClause}) AND (guideline[Publication Type] OR meta-analysis[Publication Type] OR systematic[sb] OR review[Publication Type]) AND humans[MeSH Terms] AND english[Language] AND ("${startYear}/01/01"[PDat] : "${currentYear}/12/31"[PDat])`;
 }
 
@@ -82,12 +125,20 @@ function buildFallbackQueries(topics: string[]): string[] {
   if (normalized.length === 0) return [];
   const currentYear = new Date().getFullYear();
   const startYear = currentYear - 15;
-  const titleClause = normalized.map((t) => `"${t}"[Title/Abstract]`).join(" OR ");
+  const primaryTopics = normalized.slice(0, 3);
+  const broadTopics = normalized.slice(0, 5);
+  const andTitleClause = primaryTopics.map((t) => `"${t}"[Title/Abstract]`).join(" AND ");
+  const orTitleClause = broadTopics.map((t) => `"${t}"[Title/Abstract]`).join(" OR ");
+  const meshOrTitleClause = primaryTopics
+    .map((t) => `("${t}"[Title/Abstract] OR "${t}"[MeSH Terms])`)
+    .join(" OR ");
+
   return [
-    buildPubMedQuery(normalized),
-    `(${titleClause}) AND humans[MeSH Terms] AND english[Language] AND ("${startYear}/01/01"[PDat] : "${currentYear}/12/31"[PDat])`,
-    `${normalized.join(" ")} AND humans[MeSH Terms] AND english[Language]`,
-    normalized.join(" OR "),
+    buildPubMedQuery(primaryTopics),
+    `(${andTitleClause}) AND humans[MeSH Terms] AND english[Language] AND ("${startYear}/01/01"[PDat] : "${currentYear}/12/31"[PDat])`,
+    `(${meshOrTitleClause}) AND humans[MeSH Terms] AND english[Language]`,
+    `(${orTitleClause}) AND humans[MeSH Terms] AND english[Language]`,
+    broadTopics.join(" "),
   ];
 }
 
@@ -98,9 +149,11 @@ export async function getTopEvidence(topics: string[]): Promise<EvidenceSelectio
   }
 
   const queries = buildFallbackQueries(normalizedTopics);
+  const diagnostics: string[] = [];
 
   for (const query of queries) {
     const result = await getEvidence(query);
+    if (result.diagnostics?.length) diagnostics.push(...result.diagnostics);
 
     // Stop at the first query that returns PubMed results (not fallback/unavailable).
     if (
@@ -126,13 +179,14 @@ export async function getTopEvidence(topics: string[]): Promise<EvidenceSelectio
         cacheHit: false,
         retrievedAt: new Date().toISOString(),
         staleCache: false,
-        warning: result.warning,
+        warning: [result.warning, diagnostics.at(-1)].filter(Boolean).join(" ").trim() || undefined,
       };
     }
   }
 
   // All PubMed queries failed — try the trusted fallback on the primary query.
   const fallbackResult = await getEvidence(normalizedTopics.join(" "));
+  if (fallbackResult.diagnostics?.length) diagnostics.push(...fallbackResult.diagnostics);
   const isTrusted = fallbackResult.primarySourceUsed === "trusted_fallback";
   const citations: Citation[] = fallbackResult.references.map((ref) => ({
     pmid: "",
@@ -153,6 +207,6 @@ export async function getTopEvidence(topics: string[]): Promise<EvidenceSelectio
     cacheHit: false,
     retrievedAt: new Date().toISOString(),
     staleCache: isTrusted,
-    warning: fallbackResult.warning,
+    warning: [fallbackResult.warning, diagnostics.slice(-2).join(" ")].filter(Boolean).join(" ").trim() || undefined,
   };
 }

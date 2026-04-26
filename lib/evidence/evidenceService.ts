@@ -6,6 +6,7 @@ export type { EvidenceResult, EvidenceReference };
 
 export async function getEvidence(query: string): Promise<EvidenceResult> {
   console.log(`[evidence:service] query="${query.slice(0, 80)}"`);
+  const diagnostics: string[] = [];
 
   // ── 1. PubMed ────────────────────────────────────────────────────────────
   try {
@@ -23,14 +24,17 @@ export async function getEvidence(query: string): Promise<EvidenceResult> {
         primarySourceUsed: "pubmed",
         query,
         references: pubmed.references,
+        diagnostics,
         warning: pubmed.hasAbstracts
           ? undefined
           : "Abstract retrieval failed. Results include metadata only — avoid strong conclusions.",
       };
     }
     // PubMed returned 0 results — fall through to trusted sources.
+    diagnostics.push("PubMed search completed but returned 0 results.");
     console.warn("[evidence:service] PubMed returned 0 results, trying trusted fallback");
   } catch (err) {
+    diagnostics.push(`PubMed request failed: ${err instanceof Error ? err.message : String(err)}`);
     console.warn("[evidence:service] PubMed failed, trying trusted fallback:", err);
   }
 
@@ -49,9 +53,11 @@ export async function getEvidence(query: string): Promise<EvidenceResult> {
       primarySourceUsed: "trusted_fallback",
       query,
       references: trusted.references,
+      diagnostics,
       warning,
     };
   } catch (err) {
+    diagnostics.push(`Trusted fallback failed: ${err instanceof Error ? err.message : String(err)}`);
     console.error("[evidence:service] trusted fallback also failed:", err);
   }
 
@@ -62,6 +68,7 @@ export async function getEvidence(query: string): Promise<EvidenceResult> {
     primarySourceUsed: "none",
     query,
     references: [],
+    diagnostics,
     warning:
       "Evidence retrieval is temporarily unavailable. Please consult your healthcare provider directly.",
   };

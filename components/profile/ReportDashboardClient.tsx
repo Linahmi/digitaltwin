@@ -220,9 +220,30 @@ function buildBiomarkerMetrics(data: ReportDashboardData) {
   }))
 }
 
+const scenarioApiMap: Record<ScenarioId, string> = {
+  exercise: 'exercise',
+  diet: 'improve_diet',
+  statin: 'optimize_lipids',
+  weight: 'lose_weight',
+}
+
+// Set to true to re-enable live Gemini image generation.
+const ENABLE_GEMINI_BODY_SIMULATION = false
+
+const scenarioImageMap: Record<string, string> = {
+  exercise: '/body-simulations/exercise.png',
+  improve_diet: '/body-simulations/improve_diet.png',
+  optimize_lipids: '/body-simulations/optimize_lipids.jpg',
+  lose_weight: '/body-simulations/10kg.jpg',
+}
+
 export function ReportDashboardClient({ data }: { data: ReportDashboardData }) {
   const [selectedScenarios, setSelectedScenarios] = useState<Set<ScenarioId>>(new Set())
   const [expandedCardId, setExpandedCardId] = useState<ExpandedCardId>(null)
+  const [bodyScenario, setBodyScenario] = useState<ScenarioId | null>(null)
+  const [isGeneratingBody, setIsGeneratingBody] = useState(false)
+  const [generatedBodyUrl, setGeneratedBodyUrl] = useState<string | null>(null)
+  const [bodySimError, setBodySimError] = useState<string | null>(null)
 
   const simulated = useMemo(() => scenarioAdjustedData(data, selectedScenarios), [data, selectedScenarios])
 
@@ -276,13 +297,83 @@ export function ReportDashboardClient({ data }: { data: ReportDashboardData }) {
     [data.timelineItems]
   )
 
+  const triggerBodySimulation = async (scenarioId: ScenarioId) => {
+    setBodyScenario(scenarioId)
+    setIsGeneratingBody(true)
+    setBodySimError(null)
+    setGeneratedBodyUrl(null)
+    try {
+      const res = await fetch('/api/body-simulation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario: scenarioApiMap[scenarioId],
+          patient: {
+            age: data.age,
+            sex: data.gender,
+            bmi: data.vitals.bmi,
+            weight: data.vitals.weight,
+            biomarkers: [
+              `LDL ${data.labs.ldl ?? 'N/A'} mg/dL`,
+              `HDL ${data.labs.hdl ?? 'N/A'} mg/dL`,
+              `Triglycerides ${data.labs.triglycerides ?? 'N/A'} mg/dL`,
+              `HbA1c ${data.labs.hba1c ?? 'N/A'}%`,
+              `Glucose ${data.labs.glucose ?? 'N/A'} mg/dL`,
+            ].join(', '),
+          },
+        }),
+      })
+
+      let result: { image?: string; error?: unknown }
+      try {
+        result = await res.json()
+      } catch {
+        setBodySimError('Body simulation unavailable')
+        return
+      }
+
+      if (!res.ok || result.error) {
+        console.error('[body-simulation] API error:', result.error)
+        setBodySimError('Body simulation unavailable')
+        return
+      }
+
+      if (!result.image) {
+        setBodySimError('Body simulation returned no image')
+        return
+      }
+
+      setGeneratedBodyUrl(result.image)
+    } catch (err) {
+      console.error('[body-simulation]', err)
+      setBodySimError('Body simulation unavailable')
+    } finally {
+      setIsGeneratingBody(false)
+    }
+  }
+
   const toggleScenario = (scenarioId: ScenarioId) => {
+    const isActive = selectedScenarios.has(scenarioId)
     setSelectedScenarios((prev) => {
       const next = new Set(prev)
       if (next.has(scenarioId)) next.delete(scenarioId)
       else next.add(scenarioId)
       return next
     })
+    if (isActive) {
+      if (bodyScenario === scenarioId) {
+        setBodyScenario(null)
+        setGeneratedBodyUrl(null)
+        setBodySimError(null)
+      }
+    } else {
+      const apiKey = scenarioApiMap[scenarioId]
+      setBodyScenario(scenarioId)
+      setGeneratedBodyUrl(scenarioImageMap[apiKey] ?? null)
+      if (ENABLE_GEMINI_BODY_SIMULATION) {
+        triggerBodySimulation(scenarioId)
+      }
+    }
   }
 
   const closeExpandedCard = () => setExpandedCardId(null)
@@ -346,7 +437,14 @@ export function ReportDashboardClient({ data }: { data: ReportDashboardData }) {
               heartRate={formatMetric(simulated.vitals.heartRate)}
               ldl={formatMetric(simulated.labs.ldl, 1)}
               triglycerides={formatMetric(simulated.labs.triglycerides, 1)}
+              simulatedImageUrl={generatedBodyUrl}
+              isGenerating={ENABLE_GEMINI_BODY_SIMULATION && isGeneratingBody}
             />
+            {bodySimError && (
+              <div className="pointer-events-none absolute bottom-10 left-1/2 -translate-x-1/2 rounded-full bg-rose-50/90 px-3 py-1 text-[10px] text-rose-500 shadow-sm backdrop-blur-sm">
+                {bodySimError}
+              </div>
+            )}
           </div>
 
           {/* ── RIGHT PANEL ── */}

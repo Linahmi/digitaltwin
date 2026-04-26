@@ -60,6 +60,31 @@ function MicIcon({ active }: { active: boolean }) {
   )
 }
 
+function StopIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
+      <rect x="5" y="5" width="14" height="14" rx="2.5" />
+    </svg>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="#8b5cf6" aria-hidden="true">
+      <path d="M6 4.5l14 7.5-14 7.5V4.5z" />
+    </svg>
+  )
+}
+
+function RedoIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 4v6h6" />
+      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+    </svg>
+  )
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Message {
@@ -131,7 +156,7 @@ export default function VoicePage() {
   const [dbError,       setDbError]       = useState<string | null>(null)
   const [isListening,   setIsListening]   = useState(false)
   const [isProcessing,  setIsProcessing]  = useState(false)
-  const [isSpeaking,    setIsSpeaking]    = useState(false)
+  const [voiceState,    setVoiceState]    = useState<'idle' | 'speaking' | 'paused'>('idle')
   const [statusText,    setStatusText]    = useState('Talk to me')
   const [snapshot,      setSnapshot]      = useState<PatientSnapshot | null>(null)
   const [messages,      setMessages]      = useState<Message[]>([])
@@ -141,6 +166,9 @@ export default function VoicePage() {
   const recognitionRef     = useRef<any>(null)
   const handleUserMsgRef   = useRef<(text: string) => void>(() => {})
   const contentScrollRef   = useRef<HTMLDivElement>(null)
+  const keepAliveRef       = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastSpokenTextRef  = useRef<string>('')
+  const userCancelledRef   = useRef(false)
 
   // Viewport
   useEffect(() => {
@@ -194,11 +222,12 @@ export default function VoicePage() {
 
   // Status text
   useEffect(() => {
-    if (isListening)  { setStatusText("I'm here"); return }
-    if (isProcessing) { setStatusText('Thinking together...'); return }
-    if (isSpeaking)   { setStatusText('Sharing with you...'); return }
+    if (isListening)               { setStatusText("I'm here"); return }
+    if (isProcessing)              { setStatusText('Thinking together...'); return }
+    if (voiceState === 'speaking') { setStatusText('Stop'); return }
+    if (voiceState === 'paused')   { setStatusText('Resume'); return }
     setStatusText('Talk to me')
-  }, [isListening, isProcessing, isSpeaking])
+  }, [isListening, isProcessing, voiceState])
 
   // Auto-scroll active content to bottom on new messages
   useEffect(() => {
@@ -221,7 +250,11 @@ export default function VoicePage() {
 
   const speak = useCallback(async (text: string) => {
     if (!('speechSynthesis' in window)) return
+    // Clear any running keep-alive before cancelling
+    if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null }
     window.speechSynthesis.cancel()
+    lastSpokenTextRef.current = text
+    userCancelledRef.current  = false
     await new Promise<void>(resolve => {
       if (window.speechSynthesis.getVoices().length > 0) { resolve(); return }
       window.speechSynthesis.onvoiceschanged = () => resolve()
@@ -231,13 +264,22 @@ export default function VoicePage() {
     utterance.lang = 'en-US'; utterance.rate = 1.0; utterance.pitch = 1.0; utterance.volume = 1.0
     const voice = getBestVoice()
     if (voice) utterance.voice = voice
-    utterance.onstart = () => setIsSpeaking(true)
-    const keepAlive = setInterval(() => {
-      if (!window.speechSynthesis.speaking) { clearInterval(keepAlive); return }
+    utterance.onstart = () => setVoiceState('speaking')
+    keepAliveRef.current = setInterval(() => {
+      if (!window.speechSynthesis.speaking) { clearInterval(keepAliveRef.current!); keepAliveRef.current = null; return }
       window.speechSynthesis.pause(); window.speechSynthesis.resume()
     }, 10_000)
-    utterance.onend  = () => { clearInterval(keepAlive); setIsSpeaking(false) }
-    utterance.onerror = () => { clearInterval(keepAlive); setIsSpeaking(false) }
+    utterance.onend = () => {
+      if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null }
+      // Only go idle on natural end — user-cancel sets 'paused' before onend fires
+      if (!userCancelledRef.current) setVoiceState('idle')
+      userCancelledRef.current = false
+    }
+    utterance.onerror = () => {
+      if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null }
+      if (!userCancelledRef.current) setVoiceState('idle')
+      userCancelledRef.current = false
+    }
     window.speechSynthesis.speak(utterance)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -283,20 +325,63 @@ export default function VoicePage() {
     handleUserMessage(text)
   }
 
+  const handleVoicePillClick = () => {
+    if (voiceState === 'speaking') {
+      userCancelledRef.current = true
+      if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null }
+      window.speechSynthesis.pause()
+      setVoiceState('paused')
+    } else if (voiceState === 'paused') {
+      handleContinueSpeech()
+    } else {
+      toggleMic()
+    }
+  }
+
+  const handleContinueSpeech = () => {
+    userCancelledRef.current = false
+    // A known fix for resume() not firing: pause and resume immediately
+    window.speechSynthesis.resume()
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.pause()
+      window.speechSynthesis.resume()
+    }
+
+    // Restart the keep-alive interval
+    if (!keepAliveRef.current) {
+      keepAliveRef.current = setInterval(() => {
+        if (!window.speechSynthesis.speaking) {
+          if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null }
+          return
+        }
+        window.speechSynthesis.pause()
+        window.speechSynthesis.resume()
+      }, 10_000)
+    }
+
+    setVoiceState('speaking')
+  }
+
+  const handleRedoSpeech = () => {
+    if (lastSpokenTextRef.current) speak(lastSpokenTextRef.current)
+  }
+
   const handleReset = useCallback(() => {
+    userCancelledRef.current = true
+    if (keepAliveRef.current) { clearInterval(keepAliveRef.current); keepAliveRef.current = null }
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
     setMessages([])
-    setIsSpeaking(false)
+    setVoiceState('idle')
     setIsProcessing(false)
     setIsListening(false)
     setStatusText('Talk to me')
-  }, [])
+  }, [speak, toggleMic]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived state ────────────────────────────────────────────────────────────
 
   const orbRetracted  = messages.length > 0 || isProcessing
-  const isActive      = isListening || isProcessing || isSpeaking
-  const canInteract   = !isProcessing && !isSpeaking
+  const isActive      = isListening || isProcessing || voiceState !== 'idle'
+  const canInteract   = !isProcessing && voiceState === 'idle'  // orb + suggestions only
 
   // Orb animation target
   const orbAnimate = viewW > 0
@@ -308,7 +393,7 @@ export default function VoicePage() {
   const lastAiMsg       = messages.filter(m => m.role === 'assistant').at(-1)
   const lastUserMsg     = messages.filter(m => m.role === 'user').at(-1)
   const showDashboard   = !!(lastAiMsg?.showAdaptiveFlow && lastAiMsg?.domain)
-  const lastMsgSpeaking = isSpeaking && messages.at(-1)?.role === 'assistant'
+  const lastMsgSpeaking = voiceState === 'speaking' && messages.at(-1)?.role === 'assistant'
 
   // ── Error state ──────────────────────────────────────────────────────────────
 
@@ -730,36 +815,67 @@ export default function VoicePage() {
               exit={{ opacity: 0, y: 12 }}
               transition={{ duration: 0.3 }}
               style={{
-                display: 'flex', alignItems: 'center', gap: 14,
+                display: 'flex', alignItems: 'center', gap: 12,
                 background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(16px)',
                 border: '1px solid rgba(139,92,246,0.14)',
-                borderRadius: 40, padding: '10px 22px',
+                borderRadius: 40, padding: '8px 18px',
                 boxShadow: '0 4px 24px rgba(139,92,246,0.1), 0 1px 4px rgba(0,0,0,0.06)',
               }}
             >
+              {voiceState === 'paused' && (
+                <button
+                  onClick={handleRedoSpeech}
+                  title="Restart speech"
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', color: '#8b5cf6', transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.12)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(139,92,246,0.06)'}
+                >
+                  <RedoIcon />
+                </button>
+              )}
+
               <button
-                onClick={toggleMic}
-                disabled={!canInteract}
-                aria-label={isListening ? 'Stop listening' : 'Start listening'}
+                onClick={handleVoicePillClick}
+                disabled={isProcessing}
+                aria-label={
+                  voiceState === 'speaking' ? 'Stop speaking' :
+                  voiceState === 'paused'   ? 'Resume speaking' :
+                  isListening               ? 'Stop listening' : 'Start listening'
+                }
                 style={{
                   width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-                  background: isListening
-                    ? 'linear-gradient(135deg, #8b5cf6, #06b6d4)'
-                    : 'rgba(0,0,0,0.05)',
-                  border: 'none', cursor: canInteract ? 'pointer' : 'default',
+                  background:
+                    voiceState === 'speaking' ? 'linear-gradient(135deg, #ef4444, #f97316)' :
+                    voiceState === 'paused'   ? 'linear-gradient(135deg, #8b5cf6, #06b6d4)' :
+                    isListening               ? 'linear-gradient(135deg, #8b5cf6, #06b6d4)' :
+                                                'rgba(0,0,0,0.05)',
+                  border: 'none',
+                  cursor: isProcessing ? 'default' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'background 0.3s, transform 0.15s',
+                  transition: 'background 0.2s, transform 0.15s, opacity 0.15s',
                   transform: isListening ? 'scale(1.1)' : 'scale(1)',
+                  animation: voiceState === 'speaking' ? 'speakingPulse 1.8s ease-in-out infinite' : 'none',
+                  opacity: isProcessing ? 0.4 : 1,
                 }}
               >
-                <MicIcon active={isListening} />
+                {voiceState === 'speaking' ? <StopIcon /> :
+                 voiceState === 'paused'   ? <PlayIcon /> :
+                                             <MicIcon active={isListening} />}
               </button>
+
               <span style={{
-                fontSize: 13, fontWeight: 500, minWidth: 160,
-                color: isActive ? '#8b5cf6' : '#64748b',
-                transition: 'color 0.4s',
+                fontSize: 13, fontWeight: 600, minWidth: 80,
+                color: voiceState === 'speaking' ? '#ef4444' :
+                       voiceState === 'paused'   ? '#8b5cf6' :
+                       isActive                  ? '#8b5cf6' : '#64748b',
+                transition: 'color 0.2s',
               }}>
-                {statusText}
+                {voiceState === 'paused' ? 'Continue' : statusText}
               </span>
             </motion.div>
           ) : (
@@ -804,6 +920,10 @@ export default function VoicePage() {
           50%       { transform: scaleY(1.5); opacity: 1;   }
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes speakingPulse {
+          0%, 100% { opacity: 1;   transform: scale(1); }
+          50%       { opacity: 0.7; transform: scale(0.93); }
+        }
       `}</style>
     </div>
   )

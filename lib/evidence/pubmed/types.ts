@@ -13,6 +13,7 @@ export interface EvidenceResult {
   query: string;
   references: EvidenceReference[];
   warning?: string;
+  diagnostics?: string[];
 }
 
 export interface PubMedSummary {
