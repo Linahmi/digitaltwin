@@ -598,6 +598,7 @@ export default function VoicePage() {
                 {SUGGESTIONS.map((s, i) => (
                   <motion.button
                     key={s}
+                    className="hover-lift button-pulse"
                     onClick={() => canInteract && handleSuggestion(s)}
                     disabled={!canInteract}
                     animate={{ y: [0, -7, 0] }}

@@ -422,6 +422,12 @@ export function ReportDashboardClient({ data }: { data: ReportDashboardData }) {
                   <p className="text-[10px] text-slate-500">
                     {data.age ?? 'N/A'} yr · {data.gender ?? 'N/A'}
                   </p>
+                  <Link 
+                    href="/consent"
+                    className="mt-1.5 flex items-center gap-1.5 rounded-full bg-slate-900 px-2.5 py-1 text-[9px] font-bold text-white transition hover-lift button-pulse hover:bg-slate-800"
+                  >
+                    Share Data
+                  </Link>
                 </div>
               </div>
               <p className="line-clamp-3 text-[10px] leading-[1.4] text-slate-600">{data.narrative}</p>
