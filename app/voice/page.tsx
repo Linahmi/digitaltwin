@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import Image from 'next/image'
 import type { Citation } from '@/types/patient'
 import { getHealthDomain } from '@/components/voice/domainConfig'
 import type { PatientSnapshot, Domain } from '@/components/voice/domainConfig'
@@ -440,32 +441,25 @@ export default function VoicePage() {
     >
       {/* ── Ambient background ─────────────────────────────────────────────── */}
       <div className="pointer-events-none" style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
-        {/* Breathing Anatomic Face */}
         <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: 0.15,
-          filter: 'contrast(1.1) brightness(1.1)',
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: 0.08, pointerEvents: 'none', filter: 'blur(1.5px)'
         }}>
-          <motion.img
-            src="/digital-face.png"
+          <Image
+            src="/anatomy-muscular-hero-v2.png"
             alt=""
-            animate={{
-              scale: [1, 1.02, 1],
-              opacity: [0.12, 0.18, 0.12],
-            }}
-            transition={{
-              duration: 8,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            style={{
-              maxHeight: '85vh',
-              width: 'auto',
-              objectFit: 'contain',
-            }}
+            width={1434} height={2048}
+            style={{ height: 'auto', width: 'auto', maxHeight: '95vh', objectFit: 'contain' }}
+            priority
           />
         </div>
+
+        {/* Global radial fade to avoid hard edges */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'radial-gradient(circle at center, transparent 0%, #fefefe 85%)',
+          opacity: 0.4
+        }} />
 
         {/* Global Glow */}
         <div style={{
