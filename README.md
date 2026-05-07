@@ -1,97 +1,177 @@
-# Digital Health Twin - Priority 1 MVP
+# Digital Health Twin
 
-Voice-enabled AI health assistant with patient context and evidence-based responses.
+Digital Health Twin is an interactive health simulation platform developed during **Start Hack**.  
+The project combines voice interaction, clinical data analysis, future health projections, and privacy-focused consent management into a single experience.
 
-## 🎯 What's Built (Priority 1)
+Instead of relying on static dashboards and disconnected health metrics, the platform allows users to interact conversationally with a digital representation of themselves — a **health twin** capable of explaining current health status, projecting future risks, and simulating how lifestyle or treatment changes may affect long-term outcomes.
 
-✅ **Voice Interface** - Web Speech API for input, browser TTS for output  
-✅ **Claude Integration** - Patient context injected into every conversation  
-✅ **Patient Data** - Loaded from Synthea-style JSON  
-✅ **Chat UI** - Message bubbles with user/assistant distinction  
+---
 
-## 🚀 Quick Start
+# Overview
 
-### 1. Install dependencies
+At its core, the application transforms raw patient data into a dynamic clinical simulation environment.
+
+The system normalizes biomarkers such as:
+- blood pressure
+- cholesterol
+- glucose levels
+- weight
+- other clinical indicators
+
+to generate:
+- interpretable risk trajectories
+- personalized health insights
+- future projections
+- interactive simulations
+
+Rather than simply displaying numbers, the twin contextualizes them and explains how combinations of biomarkers contribute to future health evolution.
+
+---
+
+# Main Features
+
+## Voice Health Twin
+
+Users can interact naturally using voice or text.
+
+Example questions:
+- “What are my heart risks?”
+- “What happens if I continue this lifestyle?”
+- “How would losing weight affect my future health?”
+
+The assistant responds using the patient’s health context and generates adaptive visualizations showing:
+- projected trajectories
+- biomarker trends
+- simulation outcomes
+- personalized explanations
+
+The experience is designed to feel less like reading a dashboard and more like having a conversation with a future version of yourself.
+
+---
+
+## Clinical Simulation Engine
+
+The platform includes a simulation layer allowing users to explore how lifestyle or treatment changes could affect long-term outcomes.
+
+Examples:
+- improving diet
+- exercising regularly
+- lowering LDL cholesterol
+- losing weight
+
+The interface compares:
+- current trajectory
+- improved trajectory
+
+to help users understand how their decisions influence future health.
+
+---
+
+## Interactive Visualizations
+
+The application dynamically generates:
+- risk projections
+- biomarker trend charts
+- timeline simulations
+- scenario comparisons
+
+The visual system adapts depending on the question asked by the user.
+
+---
+
+## Privacy & Web3 Consent Layer
+
+Health data remains under patient control.
+
+Blockchain technology is used only as a:
+- consent layer
+- access-control mechanism
+
+Medical records are **never stored on-chain**.
+
+The system only records:
+- patient wallet
+- doctor wallet
+- permission status
+- access expiration
+
+A dedicated consent portal allows patients to:
+- grant temporary access
+- revoke access
+- control who can access their medical data
+
+---
+
+# Tech Stack
+
+- Next.js
+- TypeScript
+- Tailwind CSS
+- Claude API
+- Web Speech API
+- Recharts
+- Web3 / Smart Contracts
+
+---
+
+# Project Structure
+
+```txt
+digital-twin/
+├── app/
+│   ├── api/               # Backend API routes
+│   ├── voice/             # Main voice simulation interface
+│   ├── profile/           # Patient dashboard
+│   ├── consent/           # Web3 consent portal
+│   └── layout.tsx
+├── components/            # Reusable UI components
+├── lib/                   # Clinical logic & utilities
+├── public/patients/       # Sample patient data
+└── types/                 # TypeScript types
+```
+
+---
+
+# Getting Started
+
+## Install dependencies
+
 ```bash
 npm install
 ```
 
-### 2. Set up environment
+## Configure environment variables
+
 ```bash
 cp .env.example .env.local
-# Edit .env.local and add your ANTHROPIC_API_KEY from console.anthropic.com
 ```
 
-### 3. Run dev server
+Add your API keys and configuration values to `.env.local`.
+
+---
+
+## Run the development server
+
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open:
 
-### 4. Test the voice interface
-
-The app will redirect to `/voice`. 
-
-**Try asking:**
-- "What's my risk of heart disease?"
-- "Why is my blood pressure high?"
-- "What should I do to lower my cholesterol?"
-
-## 📁 Project Structure
-
-```
-digital-twin/
-├── app/
-│   ├── api/chat/          # Claude API integration
-│   ├── voice/             # Main voice interface page
-│   ├── layout.tsx
-│   └── globals.css
-├── components/
-│   ├── VoiceInterface.tsx # Mic button + speech recognition
-│   └── MessageBubble.tsx  # Chat message display
-├── types/
-│   └── patient.ts         # TypeScript interfaces
-└── public/patients/
-    └── patient-001.json   # Sample patient data
+```txt
+http://localhost:3000
 ```
 
-## 🎤 Voice Interface Notes
+---
 
-- **Chrome/Edge required** - Web Speech API works best in Chromium browsers
-- **HTTPS in production** - Speech API requires secure context
-- Click the mic button to start listening
-- Twin will speak responses automatically via browser TTS
+# Notes
 
-## 🔧 Tech Stack
+- Chrome or Edge recommended for voice interaction
+- Speech recognition requires microphone permissions
+- HTTPS is required for production voice support
 
-- **Next.js 15** - App Router
-- **TypeScript**
-- **Tailwind CSS**
-- **Claude API** - @anthropic-ai/sdk
-- **Web Speech API** - Voice input
-- **Speech Synthesis API** - Voice output
+---
 
-## ⏭️ Next Steps (Priority 2)
+# Vision
 
-After Priority 1 works:
-- Add PubMed citations to responses
-- Build profile dashboard
-- Implement Framingham CVD risk calculator
-- Add what-if simulation UI
-
-## 🐛 Troubleshooting
-
-**Voice not working?**
-- Check browser console for errors
-- Ensure microphone permissions granted
-- Try Chrome/Edge (Firefox has limited support)
-
-**API errors?**
-- Verify ANTHROPIC_API_KEY in .env.local
-- Check API key permissions at console.anthropic.com
-- Look for error messages in terminal
-
-**Patient data not loading?**
-- Check browser console network tab
-- Verify patient-001.json exists in public/patients/
+The goal of Digital Health Twin is not only to display medical information, but to help users understand how their choices influence their future health — through conversation, simulation, and personalized insight.
