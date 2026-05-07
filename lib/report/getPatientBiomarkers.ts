@@ -32,7 +32,7 @@ export async function getPatientBiomarkers(patientId?: string): Promise<PatientB
   }
 
   try {
-    const summary = getClinicalSummary(patientId)
+    const summary = await getClinicalSummary(patientId)
     
     return {
       ldl: summary.latestLabs.ldl?.value ?? null,

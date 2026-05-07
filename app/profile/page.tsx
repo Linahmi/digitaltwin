@@ -1,8 +1,10 @@
 import { ReportDashboardClient } from '@/components/profile/ReportDashboardClient'
 import { getChadwickDashboardData } from '@/lib/report/getChadwickDashboardData'
 
-export default function ProfilePage() {
-  const data = getChadwickDashboardData()
+export const dynamic = 'force-dynamic'
+
+export default async function ProfilePage() {
+  const data = await getChadwickDashboardData()
 
   if (!data) {
     return (

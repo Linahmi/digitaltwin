@@ -19,8 +19,8 @@ const BP_MEDS = [
  * Extracts required Framingham inputs from the normalized clinical summary.
  * Maps raw FHIR database metrics to the standardized input format.
  */
-export function getFraminghamInputs(patientId: string): FraminghamInput {
-  const summary = getClinicalSummary(patientId);
+export async function getFraminghamInputs(patientId: string): Promise<FraminghamInput> {
+  const summary = await getClinicalSummary(patientId);
 
   // Demographics
   const age = typeof summary.demographics.age === 'number' ? summary.demographics.age : null;

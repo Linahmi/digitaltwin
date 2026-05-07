@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   const limit     = searchParams.has('limit')  ? parseInt(searchParams.get('limit')!)  : 100
 
   try {
-    const patients = listPatients({ condition, minAge, maxAge, gender, limit })
+    const patients = await listPatients({ condition, minAge, maxAge, gender, limit })
     return NextResponse.json({ patients, count: patients.length })
   } catch (error: any) {
     const isEmptyDB = error.message?.includes('No Synthea patients found')

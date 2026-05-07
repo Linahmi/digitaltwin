@@ -5,7 +5,7 @@
  * Includes a SQLite-backed cache (7-day TTL) to prevent repeated API calls.
  */
 
-import db from '../db/sqlite'
+import sql from '../db/sqlite'
 
 export interface Citation {
   pmid: string
@@ -209,9 +209,9 @@ async function fetchPubMedDetails(pmids: string[]): Promise<Citation[]> {
  * and less than 7 days old.
  */
 export async function getPubMedEvidence(query: string): Promise<PubMedEvidenceResult> {
-  // Check Cache
-  const cached = db.prepare('SELECT results_json, created_at FROM pubmed_cache WHERE query = ?').get(query) as { results_json: string, created_at: string } | undefined
-  
+  const cacheRows = await sql`SELECT results_json, created_at FROM pubmed_cache WHERE query = ${query}` as { results_json: string; created_at: string }[]
+  const cached = cacheRows[0]
+
   if (cached) {
     const ageMs = Date.now() - new Date(cached.created_at).getTime()
     const daysOld = ageMs / (1000 * 60 * 60 * 24)
@@ -225,35 +225,28 @@ export async function getPubMedEvidence(query: string): Promise<PubMedEvidenceRe
     }
   }
 
-  // Cache miss or expired, hit API
   try {
     const pmids = await searchPubMed(query)
     const citations = await fetchPubMedDetails(pmids)
     const retrievedAt = new Date().toISOString()
 
-    // Store in cache
-    db.prepare(`
-      INSERT OR REPLACE INTO pubmed_cache (query, results_json, created_at)
-      VALUES (?, ?, ?)
-    `).run(query, JSON.stringify(citations), retrievedAt)
+    await sql`
+      INSERT INTO pubmed_cache (query, results_json, created_at)
+      VALUES (${query}, ${JSON.stringify(citations)}, ${retrievedAt})
+      ON CONFLICT (query) DO UPDATE SET results_json = EXCLUDED.results_json, created_at = EXCLUDED.created_at
+    `
 
-    return {
-      citations,
-      cacheHit: false,
-      retrievedAt,
-      staleCache: false,
-    }
+    return { citations, cacheHit: false, retrievedAt, staleCache: false }
   } catch (error) {
     console.error('PubMed API Error:', error)
-    // If API fails, return cached data even if stale (if we have it)
     if (cached) {
-        console.warn('Returning stale cache due to API failure')
-        return {
-          citations: JSON.parse(cached.results_json) as Citation[],
-          cacheHit: true,
-          retrievedAt: cached.created_at,
-          staleCache: true,
-        }
+      console.warn('Returning stale cache due to API failure')
+      return {
+        citations: JSON.parse(cached.results_json) as Citation[],
+        cacheHit: true,
+        retrievedAt: cached.created_at,
+        staleCache: true,
+      }
     }
     throw error
   }

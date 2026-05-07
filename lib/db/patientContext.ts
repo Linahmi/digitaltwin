@@ -1,17 +1,4 @@
-/**
- * lib/db/patientContext.ts
- *
- * Server-only module. Queries SQLite for a patient's full record and
- * builds the context string sent to Claude.
- *
- * Migration to PostgreSQL: swap the `db` import for a pg/postgres client
- *   and update placeholder syntax (? → $1).
- *
- * Migration to a FHIR server: replace the SQL queries with FHIR REST
- *   calls to /Patient/<id>, /Condition?patient=<id>, etc.
- */
-
-import db from './sqlite'
+import sql from './sqlite'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -35,31 +22,6 @@ interface DBPatient {
   marital_status: string | null
 }
 
-interface DBCondition {
-  display: string
-  onset_date: string | null
-  status: string
-}
-
-interface DBMedication {
-  display: string
-  dosage: string | null
-  frequency: string | null
-  status: string
-}
-
-interface DBObservation {
-  display: string
-  value: number | null
-  value_string: string | null
-  unit: string | null
-  effective_date: string | null
-}
-
-interface DBAllergy {
-  substance: string
-}
-
 // ─── Age helper ─────────────────────────────────────────────────────────────
 
 function calcAge(birthDate: string | null): number | null {
@@ -72,42 +34,22 @@ function calcAge(birthDate: string | null): number | null {
   return age
 }
 
+async function ensurePatients(): Promise<boolean> {
+  if (!process.env.DATABASE_URL) return false
+  try {
+    const rows = await sql`SELECT COUNT(*) as count FROM patients` as any[]
+    return Number(rows[0].count) > 0
+  } catch {
+    return false
+  }
+}
+
 // ─── Public API ─────────────────────────────────────────────────────────────
 
-/**
- * Returns lightweight patient info (for page headers, patient lists).
- * Returns null if patientId is not found.
- * Throws if the database is empty.
- */
-export function getPatientSummary(patientId: string): SyntheaPatientSummary | null {
-  const count = (db.prepare('SELECT COUNT(*) as c FROM patients').get() as { c: number }).c
-  if (count === 0) {
-    throw new Error('No Synthea patients found. Please run the import script: bun run db:import')
-  }
-
-  const row = db.prepare('SELECT * FROM patients WHERE id = ?').get(patientId) as DBPatient | undefined
-  if (!row) return null
-
-  return {
-    id:        row.id,
-    firstName: row.first_name,
-    lastName:  row.last_name,
-    birthDate: row.birth_date,
-    gender:    row.gender,
-    age:       calcAge(row.birth_date),
-  }
-}
-
-/**
- * Returns the id and name of the first patient in the database.
- * Used when DEFAULT_PATIENT_ID is not set.
- */
-export function getFirstPatient(): SyntheaPatientSummary | null {
-  const count = (db.prepare('SELECT COUNT(*) as c FROM patients').get() as { c: number }).c
-  if (count === 0) {
-    throw new Error('No Synthea patients found. Please run the import script: bun run db:import')
-  }
-  const row = db.prepare('SELECT * FROM patients ORDER BY rowid LIMIT 1').get() as DBPatient | undefined
+export async function getPatientSummary(patientId: string): Promise<SyntheaPatientSummary | null> {
+  if (!(await ensurePatients())) return null
+  const rows = await sql`SELECT * FROM patients WHERE id = ${patientId}` as DBPatient[]
+  const row = rows[0]
   if (!row) return null
   return {
     id:        row.id,
@@ -119,93 +61,99 @@ export function getFirstPatient(): SyntheaPatientSummary | null {
   }
 }
 
-/**
- * Returns a list of patient summaries, with optional filtering.
- * Filters: condition (display LIKE), minAge, maxAge, gender.
- */
-export function listPatients(filters?: {
+export async function getFirstPatient(): Promise<SyntheaPatientSummary | null> {
+  if (!(await ensurePatients())) return null
+  const rows = await sql`SELECT * FROM patients ORDER BY id LIMIT 1` as DBPatient[]
+  const row = rows[0]
+  if (!row) return null
+  return {
+    id:        row.id,
+    firstName: row.first_name,
+    lastName:  row.last_name,
+    birthDate: row.birth_date,
+    gender:    row.gender,
+    age:       calcAge(row.birth_date),
+  }
+}
+
+export async function listPatients(filters?: {
   condition?: string
   minAge?: number
   maxAge?: number
   gender?: string
   limit?: number
-}): SyntheaPatientSummary[] {
-  const count = (db.prepare('SELECT COUNT(*) as c FROM patients').get() as { c: number }).c
-  if (count === 0) {
-    throw new Error('No Synthea patients found. Please run the import script: bun run db:import')
-  }
+}): Promise<SyntheaPatientSummary[]> {
+  if (!(await ensurePatients())) return []
 
   const limit = filters?.limit ?? 100
-  const params: any[] = []
+  const params: unknown[] = []
+  let paramIndex = 1
   const whereClauses: string[] = []
 
-  // Condition filter: join with conditions table
   let fromClause = 'FROM patients p'
   if (filters?.condition) {
     fromClause += ' INNER JOIN conditions c ON c.patient_id = p.id'
-    whereClauses.push("c.display LIKE ?")
+    whereClauses.push(`c.display ILIKE $${paramIndex++}`)
     params.push(`%${filters.condition}%`)
   }
 
-  // Gender filter
   if (filters?.gender) {
-    whereClauses.push("p.gender = ?")
+    whereClauses.push(`p.gender = $${paramIndex++}`)
     params.push(filters.gender.toLowerCase())
   }
 
-  // Age filters (derived from birth_date in SQLite)
   const currentYear = new Date().getFullYear()
   if (filters?.maxAge !== undefined) {
-    // minBirthYear
-    whereClauses.push("CAST(strftime('%Y', p.birth_date) AS INTEGER) >= ?")
+    whereClauses.push(`EXTRACT(YEAR FROM p.birth_date::date)::int >= $${paramIndex++}`)
     params.push(currentYear - filters.maxAge)
   }
   if (filters?.minAge !== undefined) {
-    // maxBirthYear
-    whereClauses.push("CAST(strftime('%Y', p.birth_date) AS INTEGER) <= ?")
+    whereClauses.push(`EXTRACT(YEAR FROM p.birth_date::date)::int <= $${paramIndex++}`)
     params.push(currentYear - filters.minAge)
   }
 
   const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : ''
-  const sql = `SELECT DISTINCT p.* ${fromClause} ${where} ORDER BY p.last_name, p.first_name LIMIT ?`
+  const query = `SELECT DISTINCT p.* ${fromClause} ${where} ORDER BY p.last_name, p.first_name LIMIT $${paramIndex}`
   params.push(limit)
 
-  const rows = db.prepare(sql).all(...params) as DBPatient[]
-  return rows.map(r => {
-    const conditions = db.prepare(
-        "SELECT display FROM conditions WHERE patient_id = ? AND status = 'active' ORDER BY onset_date DESC LIMIT 3"
-    ).all(r.id) as { display: string }[];
-      
-    return {
-      id:        r.id,
-      firstName: r.first_name,
-      lastName:  r.last_name,
-      birthDate: r.birth_date,
-      gender:    r.gender,
-      age:       calcAge(r.birth_date),
-      mainConditions: conditions.map(c => c.display)
-    };
-  })
+  const rows = await sql.query(query, params) as DBPatient[]
+
+  const patientIds = rows.map(r => r.id)
+  if (patientIds.length === 0) return []
+
+  const condRows = await sql.query(
+    `SELECT patient_id, display FROM conditions WHERE patient_id = ANY($1) AND status = 'active' ORDER BY onset_date DESC`,
+    [patientIds]
+  ) as { patient_id: string; display: string }[]
+
+  const condsByPatient = new Map<string, string[]>()
+  for (const c of condRows) {
+    const arr = condsByPatient.get(c.patient_id) ?? []
+    arr.push(c.display)
+    condsByPatient.set(c.patient_id, arr)
+  }
+
+  return rows.map(r => ({
+    id:             r.id,
+    firstName:      r.first_name,
+    lastName:       r.last_name,
+    birthDate:      r.birth_date,
+    gender:         r.gender,
+    age:            calcAge(r.birth_date),
+    mainConditions: (condsByPatient.get(r.id) ?? []).slice(0, 3),
+  }))
 }
 
 import { getClinicalSummary } from './clinicalSummary'
 
-/**
- * Builds the full patient context string for Claude.
- * Returns null if the patient is not found.
- * Throws if the database is empty.
- */
-export function buildSyntheaContext(patientId: string): string | null {
-  const count = (db.prepare('SELECT COUNT(*) as c FROM patients').get() as { c: number }).c
-  if (count === 0) {
-    throw new Error('No Synthea patients found. Please run the import script: bun run db:import')
-  }
+export async function buildSyntheaContext(patientId: string): Promise<string | null> {
+  if (!(await ensurePatients())) return null
 
-  let summary;
+  let summary
   try {
-    summary = getClinicalSummary(patientId);
-  } catch (e) {
-    return null;
+    summary = await getClinicalSummary(patientId)
+  } catch {
+    return null
   }
 
   const lines: string[] = [
@@ -228,16 +176,16 @@ export function buildSyntheaContext(patientId: string): string | null {
     `HbA1c:             ${summary.latestLabs.hba1c?.value ?? 'N/A'} %`,
     '',
     '== Clinical Trends ==',
-  ];
+  ]
 
-  const trendKeys = Object.keys(summary.trends);
+  const trendKeys = Object.keys(summary.trends)
   if (trendKeys.length === 0) {
-    lines.push('- No historical trends available');
+    lines.push('- No historical trends available')
   } else {
     trendKeys.forEach(k => {
-      const t = summary.trends[k];
-      lines.push(`- ${k}: ${t.historicalPattern} (${t.trendDirection}). ${t.abnormalValuesCount} abnormal out of ${t.previousValuesCount + 1} total values. Recent abnormalities: ${t.abnormalRecentCount}.`);
-    });
+      const t = summary.trends[k]
+      lines.push(`- ${k}: ${t.historicalPattern} (${t.trendDirection}). ${t.abnormalValuesCount} abnormal out of ${t.previousValuesCount + 1} total values. Recent abnormalities: ${t.abnormalRecentCount}.`)
+    })
   }
 
   lines.push(
@@ -266,7 +214,7 @@ export function buildSyntheaContext(patientId: string): string | null {
     '',
     '== Data Quality Notes ==',
     summary.dataQualityNotes.map((n: string) => `- ${n}`).join('\n')
-  );
+  )
 
-  return lines.join('\n');
+  return lines.join('\n')
 }

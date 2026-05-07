@@ -11,10 +11,10 @@ export async function GET(request: NextRequest) {
   try {
     const patient =
       id
-        ? getPatientSummary(id)
+        ? await getPatientSummary(id)
         : preset === 'chadwick'
-          ? findChadwickPatientSummary()
-          : getFirstPatient()
+          ? await findChadwickPatientSummary()
+          : await getFirstPatient()
 
     if (!patient) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })

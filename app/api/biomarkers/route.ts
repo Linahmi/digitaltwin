@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
     if (!patientId) {
       const selectedPatient =
         preset === 'chadwick'
-          ? findChadwickPatientSummary()
-          : getFirstPatient()
+          ? await findChadwickPatientSummary()
+          : await getFirstPatient()
 
       if (!selectedPatient) {
         return NextResponse.json({ error: 'No patients found' }, { status: 503 })
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       patientId = selectedPatient.id
     }
 
-    const summary = getClinicalSummary(patientId)
+    const summary = await getClinicalSummary(patientId)
     const display = buildPatientDisplayName(summary.demographics.firstName, summary.demographics.lastName)
 
     const biomarkers = {

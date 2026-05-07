@@ -11,14 +11,15 @@ export interface SimulationScenario {
   smokingQuit?: boolean;
 }
 
-export function simulateCVDRisk(patientId: string, scenario: SimulationScenario) {
+export async function simulateCVDRisk(patientId: string, scenario: SimulationScenario) {
   const assumptions: string[] = [];
-  
+
   // 1. Get baseline inputs and clinical summary for height/weight
-  const baselineInputs = getFraminghamInputs(patientId);
+  const [baselineInputs, summary] = await Promise.all([
+    getFraminghamInputs(patientId),
+    getClinicalSummary(patientId),
+  ]);
   const baselineRiskResult = calculateCVDRisk(baselineInputs);
-  
-  const summary = getClinicalSummary(patientId);
   const baselineWeight = summary.latestVitals?.weight?.value ?? null;
   const baselineHeight = summary.latestVitals?.height?.value ?? null; // usually in cm
   const baselineBMI = summary.latestVitals?.bmi?.value ?? null;

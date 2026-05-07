@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      const result = simulateCVDRisk(patientId, scenario as SimulationScenario);
+      const result = await simulateCVDRisk(patientId, scenario as SimulationScenario);
       
       // If we couldn't calculate risk due to missing vital data
       if (result.currentRisk === null && result.missingData.length > 0) {

@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
     let patientName: string
 
     try {
-      const summary = getPatientSummary(patientId)
+      const summary = await getPatientSummary(patientId)
       if (!summary) {
         return NextResponse.json(
           { error: `Patient not found: ${patientId}` },
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
       }
       patientName = buildPatientDisplayName(summary.firstName, summary.lastName).displayName
 
-      const ctx = buildSyntheaContext(patientId)
+      const ctx = await buildSyntheaContext(patientId)
       if (!ctx) {
         return NextResponse.json(
           { error: `Could not build context for patient: ${patientId}` },

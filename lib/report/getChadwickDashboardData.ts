@@ -7,11 +7,11 @@ function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value))
 }
 
-export function getChadwickDashboardData(): ReportDashboardData | null {
-  const patient = findChadwickPatientSummary()
+export async function getChadwickDashboardData(): Promise<ReportDashboardData | null> {
+  const patient = await findChadwickPatientSummary()
   if (!patient) return null
 
-  const summary = getClinicalSummary(patient.id)
+  const summary = await getClinicalSummary(patient.id)
   const { firstName, lastName, displayName } = buildPatientDisplayName(
     summary.demographics.firstName,
     summary.demographics.lastName

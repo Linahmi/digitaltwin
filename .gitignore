@@ -40,3 +40,5 @@ output/fhir/*
 
 synthea.jar
 *.jar
+
+.vercel
